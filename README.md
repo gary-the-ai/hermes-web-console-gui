@@ -8,8 +8,35 @@ Welcome to the **Hermes Web Console GUI**! This repository transforms the core c
 
 It provides absolute feature-parity with the Hermes CLI while drastically reducing the friction of configuration via intuitive, highly-polished React components. 
 
-## 🌟 Enhanced Features
+## 📸 UI Gallery
 
+Here is a glimpse of the gorgeous new interfaces powering your agent:
+
+<details>
+<summary><b>💬 Main Chat Interface & Token Streaming</b></summary>
+
+![Chat GUI](assets/screenshots/chat.png)
+</details>
+
+<details>
+<summary><b>📁 Workspace & Code Tools Sandbox</b></summary>
+
+![Workspace UI](assets/screenshots/workspace.png)
+</details>
+
+<details>
+<summary><b>⚙️ Settings & Configuration Control Center</b></summary>
+
+![Control Center](assets/screenshots/control_center.png)
+</details>
+
+<details>
+<summary><b>📋 Persistent Session Browser</b></summary>
+
+![Sessions List](assets/screenshots/sessions.png)
+</details>
+
+## 🌟 Enhanced Features
 - **Live SSE Token Streaming**: True GPT-style typewriter rendering connecting directly to the core Hermes API Event Stream (`message.assistant.delta`).
 - **xterm.js Interactive Sandbox**: Execute native CLI tasks and inspect live runtime logs entirely from a drawer nested within your browser. No separate windows required.
 - **Git-Style Inline Diffs**: Real-time syntax-highlighted visualizations when the agent touches your workspace files.
