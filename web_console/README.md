@@ -1,0 +1,55 @@
+<p align="center">
+  <img src="../assets/banner.png" alt="Hermes Agent" width="100%">
+</p>
+
+# Hermes Web Console 🖥️✨
+
+A highly polished, modern web dashboard for **Hermes Agent**. The Web Console brings the raw power of the Hermes terminal and its core configurability directly to the browser, offering feature-parity with the CLI while introducing intuitive drag-and-drop workflows for advanced agentic operations.
+
+## ✨ Features
+
+- **Live Streaming Parity**: Connects directly to the core Hermes API Event Stream (`message.assistant.delta`) to offer responsive typewriter streaming without delays.
+- **Agentic IDE Sandbox**: Inspect live runtime logs and tools, and spawn native `xterm.js` terminal environments inside the drawer.
+- **Visual Configurations**: Avoid editing `config.yaml` manually. Setup complex hierarchies like drag-and-drop ordered **Fallback Providers**, multi-key **Credential Pools**, and isolated Messaging Gateways all from an organized UI.
+- **Theme Persistence**: Dark, light, or completely custom skins. Changes are natively synchronized with your overarching Hermes profile.
+- **Syntax Highlighting & Inline Diffs**: Unified, collapsible Git-style file diffs directly inside the chat interface letting you confidently review the agent's file modifications.
+
+## 🚀 Quick Start
+
+The console acts as a client connected to the Hermes Local API Server.
+
+Ensure you have your backend running:
+```bash
+hermes api start
+```
+
+### Running the UI (Development)
+
+Navigate to the `web_console` directory:
+
+```bash
+cd web_console
+npm install
+npm run dev
+```
+Navigate to `http://localhost:5173` locally. Set your backend URL mapping inside the UI Settings if the API server resides on a custom port or remote network.
+
+### Building for Production
+
+Compile the production bundle cleanly:
+
+```bash
+npm run build
+```
+
+The optimized static assets will populate the `/dist` directory automatically compatible with most static web-farm configurations or native integrations back onto the python API router.
+
+## 🛠️ Tech Stack
+- **React.js 18** (Vite Compiler)
+- **TypeScript** natively integrated for safe schema bindings.
+- **xterm.js** offering completely native ANSI terminal playback.
+- **react-markdown** & **PrismJS** for syntax-focused presentation.
+
+---
+
+*Part of the NousResearch / Hermes Agent Ecosystem.*

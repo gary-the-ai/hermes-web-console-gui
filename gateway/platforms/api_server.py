@@ -34,10 +34,12 @@ except ImportError:
     web = None  # type: ignore[assignment]
 
 from gateway.config import Platform, PlatformConfig
+from gateway.platforms.api_server_ui import get_api_server_ui_html
 from gateway.platforms.base import (
     BasePlatformAdapter,
     SendResult,
 )
+from gateway.web_console import maybe_register_web_console
 
 logger = logging.getLogger(__name__)
 
@@ -444,6 +446,26 @@ class APIServerAdapter(BasePlatformAdapter):
     async def _handle_health(self, request: "web.Request") -> "web.Response":
         """GET /health — simple health check."""
         return web.json_response({"status": "ok", "platform": "hermes-agent"})
+
+    async def _handle_ui(self, request: "web.Request") -> "web.Response":
+        """GET / — lightweight browser chat UI for the local API server."""
+        html = get_api_server_ui_html(
+            api_base_url="/v1",
+            requires_api_key=bool(self._api_key),
+            default_model="hermes-agent",
+        )
+        return web.Response(text=html, content_type="text/html")
+
+    def _register_routes(self, app: "web.Application") -> None:
+        """Register API, browser UI, and web console routes on an aiohttp app."""
+        app.router.add_get("/", self._handle_ui)
+        app.router.add_get("/health", self._handle_health)
+        app.router.add_get("/v1/models", self._handle_models)
+        app.router.add_post("/v1/chat/completions", self._handle_chat_completions)
+        app.router.add_post("/v1/responses", self._handle_responses)
+        app.router.add_get("/v1/responses/{response_id}", self._handle_get_response)
+        app.router.add_delete("/v1/responses/{response_id}", self._handle_delete_response)
+        maybe_register_web_console(app, adapter=self)
 
     async def _handle_models(self, request: "web.Request") -> "web.Response":
         """GET /v1/models — return hermes-agent as an available model."""
@@ -1295,13 +1317,13 @@ class APIServerAdapter(BasePlatformAdapter):
             mws = [mw for mw in (cors_middleware, body_limit_middleware, security_headers_middleware) if mw is not None]
             self._app = web.Application(middlewares=mws)
             self._app["api_server_adapter"] = self
-            self._app.router.add_get("/health", self._handle_health)
+            
+            # Register base routes and web console
+            self._register_routes(self._app)
+            
+            # Additional upstream routes
             self._app.router.add_get("/v1/health", self._handle_health)
-            self._app.router.add_get("/v1/models", self._handle_models)
-            self._app.router.add_post("/v1/chat/completions", self._handle_chat_completions)
-            self._app.router.add_post("/v1/responses", self._handle_responses)
-            self._app.router.add_get("/v1/responses/{response_id}", self._handle_get_response)
-            self._app.router.add_delete("/v1/responses/{response_id}", self._handle_delete_response)
+            
             # Cron jobs management API
             self._app.router.add_get("/api/jobs", self._handle_list_jobs)
             self._app.router.add_post("/api/jobs", self._handle_create_job)
