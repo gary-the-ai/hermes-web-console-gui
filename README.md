@@ -36,6 +36,12 @@ Here is a glimpse of the gorgeous new interfaces powering your agent:
 ![Sessions List](assets/screenshots/sessions.png)
 </details>
 
+<details>
+<summary><b>🛠️ Skills Hub Storefront</b></summary>
+
+![Skills Hub](assets/screenshots/skills_hub.png)
+</details>
+
 ## 🌟 Enhanced Features
 - **Live SSE Token Streaming**: True GPT-style typewriter rendering connecting directly to the core Hermes API Event Stream (`message.assistant.delta`).
 - **xterm.js Interactive Sandbox**: Execute native CLI tasks and inspect live runtime logs entirely from a drawer nested within your browser. No separate windows required.

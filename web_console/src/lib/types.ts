@@ -1,4 +1,4 @@
-export type PrimaryRoute = 'chat' | 'sessions' | 'workspace' | 'usage' | 'jobs';
+export type PrimaryRoute = 'chat' | 'sessions' | 'workspace' | 'usage' | 'jobs' | 'skills';
 
 export type InspectorTab = 'run' | 'tools' | 'todo' | 'session' | 'human' | 'memory' | 'logs' | 'browser';
 export type DrawerTab = 'terminal' | 'processes' | 'logs' | 'browser';

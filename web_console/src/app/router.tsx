@@ -35,6 +35,13 @@ export const ROUTES: readonly RouteDefinition[] = [
     description: 'Track background agents.',
     headline: 'Background Jobs',
     summary: 'Monitor status of dispatched background agents.'
+  },
+  {
+    id: 'skills',
+    label: 'Skills',
+    description: 'Browse, install, and manage skills.',
+    headline: 'Skills Hub',
+    summary: 'Enhance your agent with official and community skills or create your own.'
   }
 ] as const;
 

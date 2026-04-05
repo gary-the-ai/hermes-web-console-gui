@@ -6,6 +6,7 @@ import { SessionsPage } from '../../pages/SessionsPage';
 import { WorkspacePage } from '../../pages/WorkspacePage';
 import { UsagePage } from '../../pages/UsagePage';
 import { JobsPage } from '../../pages/JobsPage';
+import { SkillsPage } from '../../pages/SkillsPage';
 import { initialUiState, setInspectorTab, setRoute, toggleDrawer, toggleInspector, toggleModal } from '../../store/uiStore';
 import { BottomDrawer } from './BottomDrawer';
 import { Inspector } from './Inspector';
@@ -19,6 +20,7 @@ function RouteContent({ routeId }: { routeId: PrimaryRoute }) {
   if (routeId === 'workspace') return <WorkspacePage />;
   if (routeId === 'usage') return <UsagePage />;
   if (routeId === 'jobs') return <JobsPage />;
+  if (routeId === 'skills') return <SkillsPage />;
   return null;
 }
 
@@ -38,7 +40,7 @@ export function AppShell() {
       const parts = hash.split('/');
       const nextRoute = parts[0] as PrimaryRoute;
       
-      if (['chat', 'sessions', 'workspace', 'usage', 'jobs'].includes(nextRoute)) {
+      if (['chat', 'sessions', 'workspace', 'usage', 'jobs', 'skills'].includes(nextRoute)) {
         if (uiState.route !== nextRoute) {
           setUiState(current => setRoute(current, nextRoute));
         }
