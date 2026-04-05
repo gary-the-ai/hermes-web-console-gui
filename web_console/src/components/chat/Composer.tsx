@@ -83,11 +83,24 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setShowSlashMenu(false);
-    const message = prompt.trim();
+    let message = prompt.trim();
     if (!message && attachments.length === 0) return;
     const currentAttachments = [...attachments];
-    const bg = isBackground;
-    const qa = isQuickAsk;
+    let bg = isBackground;
+    let qa = isQuickAsk;
+
+    // Intercept standalone slash commands
+    if (message.startsWith('/btw ') || message === '/btw') {
+      qa = true;
+      message = message.replace(/^\/btw\s*/, '');
+    } else if (message.startsWith('/bg ') || message === '/bg') {
+      bg = true;
+      message = message.replace(/^\/bg\s*/, '');
+    } else if (message.startsWith('/background ') || message === '/background') {
+      bg = true;
+      message = message.replace(/^\/background\s*/, '');
+    }
+
     setPrompt('');
     setAttachments([]);
     await onSend(message || '(attached files)', currentAttachments, bg, qa);
