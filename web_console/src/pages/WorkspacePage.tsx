@@ -70,7 +70,7 @@ export function WorkspacePage() {
     if (!selectedPath) return;
     let active = true;
 
-    apiClient.get<any>(`/workspace/file?path=${encodeURIComponent(selectedPath)}`)
+    apiClient.get<any>(`/workspace/file?path=${encodeURIComponent(selectedPath)}&limit=2000`)
       .then((r) => {
         if (!active) return;
         if (r.ok && r.file && r.file.content != null) {
@@ -160,7 +160,7 @@ export function WorkspacePage() {
       </div>
 
       <div className="workspace-column workspace-column-main">
-        <FileViewer path={selectedPath} content={fileContent} />
+        <FileViewer path={selectedPath} content={fileContent} onContentChange={setFileContent} />
         <DiffViewer diff={diff} />
       </div>
 

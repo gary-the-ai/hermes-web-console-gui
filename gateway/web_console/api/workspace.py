@@ -191,12 +191,34 @@ async def handle_kill_process(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "result": result})
 
 
+async def handle_workspace_file_save(request: web.Request) -> web.Response:
+    data = await _read_json_body(request)
+    if data is None:
+        return _json_error(status=400, code="invalid_json", message="Request body must be a valid JSON object.")
+    path = data.get("path")
+    content = data.get("content")
+    if not isinstance(path, str) or not path:
+        return _json_error(status=400, code="missing_path", message="The 'path' field must be a non-empty string.")
+    if not isinstance(content, str):
+        return _json_error(status=400, code="missing_content", message="The 'content' field must be a string.")
+
+    service = _get_workspace_service(request)
+    try:
+        result = service.save_file(path=path, content=content)
+    except ValueError as exc:
+        return _json_error(status=400, code="invalid_path", message=str(exc))
+    except OSError as exc:
+        return _json_error(status=500, code="write_failed", message=str(exc))
+    return web.json_response({"ok": True, **result})
+
+
 def register_workspace_api_routes(app: web.Application) -> None:
     if app.get(WORKSPACE_SERVICE_APP_KEY) is None:
         app[WORKSPACE_SERVICE_APP_KEY] = WorkspaceService()
 
     app.router.add_get("/api/gui/workspace/tree", handle_workspace_tree)
     app.router.add_get("/api/gui/workspace/file", handle_workspace_file)
+    app.router.add_post("/api/gui/workspace/file/save", handle_workspace_file_save)
     app.router.add_get("/api/gui/workspace/search", handle_workspace_search)
     app.router.add_get("/api/gui/workspace/diff", handle_workspace_diff)
     app.router.add_get("/api/gui/workspace/checkpoints", handle_workspace_checkpoints)
@@ -204,3 +226,4 @@ def register_workspace_api_routes(app: web.Application) -> None:
     app.router.add_get("/api/gui/processes", handle_list_processes)
     app.router.add_get("/api/gui/processes/{process_id}/log", handle_process_log)
     app.router.add_post("/api/gui/processes/{process_id}/kill", handle_kill_process)
+

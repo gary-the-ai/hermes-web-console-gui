@@ -208,6 +208,24 @@ class WorkspaceService:
             },
         }
 
+    def save_file(self, *, path: str, content: str) -> dict[str, Any]:
+        """Write *content* to the file at *path* inside the workspace."""
+        target = self._resolve_path(path, allow_root=False)
+        if target.is_dir():
+            raise ValueError("The requested path is a directory, not a file.")
+        if self._is_binary_file(target) and target.exists():
+            raise ValueError("Binary files cannot be saved through this endpoint.")
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        return {
+            "workspace_root": str(self.workspace_root),
+            "file": {
+                "path": self._relative_path(target),
+                "size": target.stat().st_size,
+            },
+        }
+
     def search_workspace(
         self,
         *,
