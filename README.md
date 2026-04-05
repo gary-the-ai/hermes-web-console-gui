@@ -112,9 +112,10 @@ npm run build
 The optimized static assets will populate the `/web_console/dist` directory. This static bundle is drop-in compatible with Vercel, Netlify, Nginx, or directly mounted against the FastAPI endpoints.
 
 ## 🛠️ Technology Stack
-- **React 18** (Vite Compiler)
+- **React 19** (Vite 6 Compiler)
 - **TypeScript** natively integrated bounding UI props to strict Python schema counterparts.
 - **Zustand** orchestrating lightweight global state logic cleanly.
+- **Recharts** powering interactive analytics dashboards with responsive bar & pie charts.
 - **xterm.js** managing the real-time background web-socket terminal interfaces.
 - **react-markdown** / **PrismJS** for extensive rendering rules (Code, Tables, Diff Blocks).
 
@@ -134,17 +135,23 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 
 ## 📜 Changelog
 
-### [2026.4.5] - Provider Configs & Upstream Sync
-- **Backend Sync**: Decoupled `models_api` hardcoded catalog. Subscribes completely to upstream `list_authenticated_providers()`.
-- **Global Model Store**: Enabled settings sync into `~/.hermes/config.yaml` using dynamic provider detection. 
-- **TopBar Upgrade**: Included visually-striking Dropdown containing active model aliasing & quick-switches instantly mid-session.
-- **ProviderManager**: Visual CRUD capabilities to inject localized LocalAI/vLLM endpoints seamlessly.
+### [2026.4.5c] - Upstream Sync & Analytics Dashboard
+- **Upstream Merge**: Synced 52 commits from `NousResearch/hermes-agent` main branch. Resolved merge conflict in `run_agent.py` (structured `tool_progress_callback` signature change).
+- **Analytics Dashboard**: New "Analytics & Insights" tab in Control Center powered by `recharts`. Visualizes session history, token usage, cost breakdowns, tool invocation distribution, and activity streaks.
+- **API Validated**: All 15+ backend API endpoints verified operational (`/api/gui/usage/insights`, `/api/gui/models/active`, `/api/gui/gateway/platforms`, etc.).
+- **Upstream Features Absorbed**: OSV malware scanning for MCP packages, Matrix E2EE support, browser JS evaluation, plugin CLI registration, and 30-min default agent timeout.
 
-### [2026.4.5] - Skills Hub App Store Redesign
+### [2026.4.5b] - Skills Hub App Store Redesign
 - **App Store UI**: Redesigned `Skills Hub` search mapping onto a glassmorphism-style CSS grid imitating premium app storefronts.
 - **Dynamic Browse**: Introduced a zero-query fetch algorithm fetching top & official items seamlessly on mount for immediate content discovery.
 - **Navigation Tweaks**: Segmented storefront from locally installed skills using intuitive tab layouts in `SkillsPage`.
 - **Rich Context Info**: Inserted visual trust badges, capability indexing tags, and polished hover states inside each storefront card.
+
+### [2026.4.5a] - Provider Configs & Model Switching
+- **Backend Sync**: Decoupled `models_api` hardcoded catalog. Subscribes completely to upstream `list_authenticated_providers()`.
+- **Global Model Store**: Enabled settings sync into `~/.hermes/config.yaml` using dynamic provider detection. 
+- **TopBar Upgrade**: Included visually-striking Dropdown containing active model aliasing & quick-switches instantly mid-session.
+- **ProviderManager**: Visual CRUD capabilities to inject localized LocalAI/vLLM endpoints seamlessly.
 
 ---
 Built by developers who love beautiful terminals, for developers who want more than a terminal. ✨
