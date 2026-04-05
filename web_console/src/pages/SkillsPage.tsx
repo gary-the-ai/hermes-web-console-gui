@@ -122,6 +122,8 @@ export function SkillsPage() {
         </button>
       </div>
 
+      <SkillHubSearch onInstallComplete={refreshSkills} />
+
       <SkillList
         title="Local & Installed Skills"
         description="Active skills available for this session."
@@ -130,8 +132,6 @@ export function SkillsPage() {
         onUnload={handleUnload}
         onViewDetail={handleViewDetail}
       />
-
-      <SkillHubSearch onInstallComplete={refreshSkills} />
 
       {isEditorOpen && (
         <SkillEditor
