@@ -140,5 +140,11 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 - **TopBar Upgrade**: Included visually-striking Dropdown containing active model aliasing & quick-switches instantly mid-session.
 - **ProviderManager**: Visual CRUD capabilities to inject localized LocalAI/vLLM endpoints seamlessly.
 
+### [2026.4.5] - Skills Hub App Store Redesign
+- **App Store UI**: Redesigned `Skills Hub` search mapping onto a glassmorphism-style CSS grid imitating premium app storefronts.
+- **Dynamic Browse**: Introduced a zero-query fetch algorithm fetching top & official items seamlessly on mount for immediate content discovery.
+- **Navigation Tweaks**: Segmented storefront from locally installed skills using intuitive tab layouts in `SkillsPage`.
+- **Rich Context Info**: Inserted visual trust badges, capability indexing tags, and polished hover states inside each storefront card.
+
 ---
 Built by developers who love beautiful terminals, for developers who want more than a terminal. ✨

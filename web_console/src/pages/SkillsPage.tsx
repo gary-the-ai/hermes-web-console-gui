@@ -96,42 +96,85 @@ export function SkillsPage() {
     }
   };
 
+  const [activeTab, setActiveTab] = useState<'storefront' | 'installed'>('storefront');
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ margin: '0 0 8px 0', fontSize: '1.5rem', color: '#f8fafc' }}>Skills & Capabilities</h1>
           <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem' }}>
             Enhance your agent with official and community skills or create your own.
           </p>
         </div>
+        {activeTab === 'installed' && (
+          <button
+            onClick={() => setIsEditorOpen(true)}
+            style={{
+              padding: '10px 16px',
+              background: 'rgba(99, 102, 241, 0.15)',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              color: '#818cf8',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontWeight: 500,
+              transition: 'all 0.2s',
+            }}
+          >
+            + Create Skill
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', gap: '20px', marginBottom: '10px' }}>
         <button
-          onClick={() => setIsEditorOpen(true)}
+          onClick={() => setActiveTab('storefront')}
           style={{
-            padding: '10px 16px',
-            background: 'rgba(99, 102, 241, 0.15)',
-            border: '1px solid rgba(99, 102, 241, 0.3)',
-            color: '#818cf8',
-            borderRadius: '10px',
+            padding: '10px 4px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'storefront' ? '2px solid #818cf8' : '2px solid transparent',
+            color: activeTab === 'storefront' ? '#f8fafc' : '#94a3b8',
+            fontSize: '1rem',
+            fontWeight: activeTab === 'storefront' ? 600 : 400,
             cursor: 'pointer',
-            fontWeight: 500,
-            transition: 'all 0.2s',
+            transition: 'all 0.2s'
           }}
         >
-          + Create Skill
+          🌟 Skills Storefront
+        </button>
+        <button
+          onClick={() => setActiveTab('installed')}
+          style={{
+            padding: '10px 4px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'installed' ? '2px solid #818cf8' : '2px solid transparent',
+            color: activeTab === 'installed' ? '#f8fafc' : '#94a3b8',
+            fontSize: '1rem',
+            fontWeight: activeTab === 'installed' ? 600 : 400,
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          📦 Installed & Local
         </button>
       </div>
 
-      <SkillHubSearch onInstallComplete={refreshSkills} />
+      {activeTab === 'storefront' && (
+        <SkillHubSearch onInstallComplete={refreshSkills} />
+      )}
 
-      <SkillList
-        title="Local & Installed Skills"
-        description="Active skills available for this session."
-        skills={skills}
-        onLoad={handleLoad}
-        onUnload={handleUnload}
-        onViewDetail={handleViewDetail}
-      />
+      {activeTab === 'installed' && (
+        <SkillList
+          title="Local & Installed Skills"
+          description="Active skills available for this session."
+          skills={skills}
+          onLoad={handleLoad}
+          onUnload={handleUnload}
+          onViewDetail={handleViewDetail}
+        />
+      )}
 
       {isEditorOpen && (
         <SkillEditor
