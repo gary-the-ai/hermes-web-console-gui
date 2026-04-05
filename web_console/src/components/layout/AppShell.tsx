@@ -16,15 +16,22 @@ import { ControlCenterModal } from './ControlCenterModal';
 import { Toaster } from '../shared/Toaster';
 import { ArtifactViewer } from '../chat/ArtifactViewer';
 
-function RouteContent({ routeId, voiceMode }: { routeId: PrimaryRoute; voiceMode: boolean }) {
-  if (routeId === 'chat') return <ChatPage voiceMode={voiceMode} />;
-  if (routeId === 'sessions') return <SessionsPage />;
-  if (routeId === 'workspace') return <WorkspacePage />;
-  if (routeId === 'usage') return <UsagePage />;
-  if (routeId === 'jobs') return <JobsPage />;
-  if (routeId === 'skills') return <SkillsPage />;
-  if (routeId === 'memory') return <MemoryPage />;
-  return null;
+/** Render all routes simultaneously, hiding inactive ones with CSS.
+ *  This keeps components mounted so chat state, SSE connections, etc. persist
+ *  across tab switches instead of being destroyed on unmount. */
+function AllRoutes({ activeRoute, voiceMode }: { activeRoute: PrimaryRoute; voiceMode: boolean }) {
+  const hidden = (id: PrimaryRoute) => ({ display: activeRoute === id ? 'flex' : 'none', flex: 1, flexDirection: 'column' as const, overflow: 'hidden' });
+  return (
+    <>
+      <div style={hidden('chat')}><ChatPage voiceMode={voiceMode} /></div>
+      <div style={hidden('sessions')}><SessionsPage /></div>
+      <div style={hidden('workspace')}><WorkspacePage /></div>
+      <div style={hidden('usage')}><UsagePage /></div>
+      <div style={hidden('jobs')}><JobsPage /></div>
+      <div style={hidden('skills')}><SkillsPage /></div>
+      <div style={hidden('memory')}><MemoryPage /></div>
+    </>
+  );
 }
 
 export function AppShell() {
@@ -113,7 +120,7 @@ export function AppShell() {
 
       <div className="layout-body">
         <main className="content" aria-label="Main content">
-          <RouteContent routeId={route.id} voiceMode={uiState.voiceMode} />
+          <AllRoutes activeRoute={route.id} voiceMode={uiState.voiceMode} />
         </main>
 
         <Inspector open={uiState.inspectorOpen} activeTab={uiState.inspectorTab} onTabChange={selectInspectorTab} />
