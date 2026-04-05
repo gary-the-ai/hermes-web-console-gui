@@ -3,6 +3,7 @@ import { ToolsPage } from '../../pages/ToolsPage';
 import { GatewayPage } from '../../pages/GatewayPage';
 import { SkillsPage } from '../../pages/SkillsPage';
 import { AutomationsPage } from '../../pages/AutomationsPage';
+import { InsightsPage } from '../../pages/InsightsPage';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
 import type { ModalTab } from '../../lib/types';
 import { cx } from '../../lib/utils';
@@ -20,7 +21,8 @@ const MODAL_TABS: { id: ModalTab; label: string }[] = [
   { id: 'tools', label: 'Tools & Toolsets' },
   { id: 'gateway', label: 'Messaging Gateway' },
   { id: 'skills', label: 'Agent Skills' },
-  { id: 'automations', label: 'Automations (Cron)' }
+  { id: 'automations', label: 'Automations (Cron)' },
+  { id: 'insights', label: 'Analytics & Insights' }
 ];
 
 export function ControlCenterModal({ open, activeTab, onTabChange, onClose }: ControlCenterModalProps) {
@@ -58,6 +60,7 @@ export function ControlCenterModal({ open, activeTab, onTabChange, onClose }: Co
               {activeTab === 'gateway' && <GatewayPage />}
               {activeTab === 'skills' && <SkillsPage />}
               {activeTab === 'automations' && <AutomationsPage />}
+              {activeTab === 'insights' && <InsightsPage />}
             </ErrorBoundary>
           </main>
         </div>

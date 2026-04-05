@@ -2,7 +2,7 @@ export type PrimaryRoute = 'chat' | 'sessions' | 'workspace' | 'usage' | 'jobs' 
 
 export type InspectorTab = 'run' | 'tools' | 'todo' | 'session' | 'human' | 'memory' | 'logs' | 'browser';
 export type DrawerTab = 'terminal' | 'processes' | 'logs' | 'browser';
-export type ModalTab = 'settings' | 'tools' | 'gateway' | 'skills' | 'automations';
+export type ModalTab = 'settings' | 'tools' | 'gateway' | 'skills' | 'automations' | 'insights';
 
 export interface NavItem {
   id: PrimaryRoute;
