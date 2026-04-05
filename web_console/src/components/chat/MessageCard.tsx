@@ -110,23 +110,49 @@ export function MessageCard({ role, title, content, isStreaming }: MessageCardPr
                           borderBottom: '1px solid #333'
                         }}>
                           <span>{language}</span>
-                          <button
-                            onClick={() => handleCopy(contentString)}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#d4d4d4',
-                              cursor: 'pointer',
-                              padding: '2px 6px',
-                              fontSize: '0.75rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            title="Copy to clipboard"
-                          >
-                            📋 Copy
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              onClick={() => handleCopy(contentString)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#d4d4d4',
+                                cursor: 'pointer',
+                                padding: '2px 6px',
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                              title="Copy to clipboard"
+                            >
+                              📋 Copy
+                            </button>
+                            {['html', 'svg', 'xml'].includes(language.toLowerCase()) && (
+                              <button
+                                onClick={() => {
+                                  window.dispatchEvent(new CustomEvent('hermes:openArtifact', {
+                                    detail: { type: language.toLowerCase(), content: contentString }
+                                  }));
+                                }}
+                                style={{
+                                  background: 'rgba(129, 140, 248, 0.2)',
+                                  border: '1px solid rgba(129, 140, 248, 0.4)',
+                                  color: '#a5b4fc',
+                                  cursor: 'pointer',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.75rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Open in Canvas Overlay"
+                              >
+                                🎨 Open Canvas
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <SyntaxHighlighter
                           style={vscDarkPlus as any}

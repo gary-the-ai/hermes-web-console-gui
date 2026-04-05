@@ -42,6 +42,13 @@ export const ROUTES: readonly RouteDefinition[] = [
     description: 'Browse, install, and manage skills.',
     headline: 'Skills Hub',
     summary: 'Enhance your agent with official and community skills or create your own.'
+  },
+  {
+    id: 'memory',
+    label: 'Memory',
+    description: 'View and edit long-term agent memory.',
+    headline: 'Agent Memory',
+    summary: 'What Hermes remembers about you and your workspace across sessions.'
   }
 ] as const;
 

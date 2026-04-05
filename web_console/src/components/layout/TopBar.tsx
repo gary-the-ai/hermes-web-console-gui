@@ -11,6 +11,8 @@ interface TopBarProps {
   onToggleSettings(): void;
   onToggleInspector(): void;
   onToggleDrawer(): void;
+  voiceMode: boolean;
+  onToggleVoiceMode(): void;
 }
 
 interface VersionResponse {
@@ -33,9 +35,11 @@ const NAV_ICONS: Record<string, string> = {
   workspace: '📂',
   usage: '📊',
   jobs: '⚡',
+  skills: '✨',
+  memory: '🧠'
 };
 
-export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSettings, onToggleDrawer, onToggleInspector }: TopBarProps) {
+export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSettings, onToggleDrawer, onToggleInspector, voiceMode, onToggleVoiceMode }: TopBarProps) {
   const [version, setVersion] = useState<string | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -126,6 +130,15 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
 
       {/* Right: Action buttons */}
       <div className="topbar-actions">
+        <button 
+          type="button" 
+          className="topbar-action-btn" 
+          onClick={onToggleVoiceMode} 
+          title="Voice Mode (Text-to-Speech)"
+          style={voiceMode ? { color: '#fcd34d', background: 'rgba(252, 211, 77, 0.15)' } : {}}
+        >
+          {voiceMode ? '🔊' : '🔈'}
+        </button>
         <button type="button" className="topbar-action-btn" onClick={onToggleSettings} title="Control Center">
           ⚙️
         </button>

@@ -7,7 +7,11 @@ export const initialUiState: UiState = {
   drawerOpen: false,
   drawerTab: 'terminal',
   modalOpen: false,
-  modalTab: 'settings'
+  modalTab: 'settings',
+  voiceMode: false,
+  artifactOpen: false,
+  artifactContent: null,
+  artifactType: null
 };
 
 export function setRoute(state: UiState, route: PrimaryRoute): UiState {
@@ -36,4 +40,16 @@ export function toggleModal(state: UiState, modalTab?: UiState['modalTab']): UiS
     modalOpen: modalTab ? true : !state.modalOpen,
     modalTab: modalTab ?? state.modalTab
   };
+}
+
+export function toggleVoiceMode(state: UiState): UiState {
+  return { ...state, voiceMode: !state.voiceMode };
+}
+
+export function openArtifact(state: UiState, artifactContent: string, artifactType: string): UiState {
+  return { ...state, artifactOpen: true, artifactContent, artifactType };
+}
+
+export function closeArtifact(state: UiState): UiState {
+  return { ...state, artifactOpen: false, artifactContent: null, artifactType: null };
 }

@@ -62,7 +62,7 @@ function mapGuiEventToTranscriptItem(event: GuiEvent): TranscriptItem | null {
   return null;
 }
 
-export function ChatPage() {
+export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
   const [items, setItems] = useState<TranscriptItem[]>(DEFAULT_ITEMS);
   const [runStatus, setRunStatus] = useState('connecting');
   const [sessionId, setSessionId] = useState('current');
@@ -75,6 +75,15 @@ export function ChatPage() {
   const [reasoningEffort, setReasoningEffort] = useState<string>('none');
   const subscriptionRef = useRef<{ close(): void } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const voiceModeRef = useRef(voiceMode);
+
+  // Sync voiceMode prop to ref for event callbacks
+  useEffect(() => {
+    voiceModeRef.current = voiceMode;
+    if (!voiceMode && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }, [voiceMode]);
 
   // Sync state with Inspector Panels
   useEffect(() => {
@@ -148,6 +157,13 @@ export function ChatPage() {
           }
           return next;
         });
+
+        if (voiceModeRef.current && text && window.speechSynthesis) {
+          // Cancel any ongoing speech
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text.slice(0, 1000)); // Speak up to 1000 chars to avoid memory issues
+          window.speechSynthesis.speak(utterance);
+        }
       }
 
       if (event.type === 'tool.started') {

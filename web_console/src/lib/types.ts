@@ -1,4 +1,4 @@
-export type PrimaryRoute = 'chat' | 'sessions' | 'workspace' | 'usage' | 'jobs' | 'skills';
+export type PrimaryRoute = 'chat' | 'sessions' | 'workspace' | 'usage' | 'jobs' | 'skills' | 'memory';
 
 export type InspectorTab = 'run' | 'tools' | 'todo' | 'session' | 'human' | 'memory' | 'logs' | 'browser';
 export type DrawerTab = 'terminal' | 'processes' | 'logs' | 'browser';
@@ -23,6 +23,10 @@ export interface UiState {
   drawerTab: DrawerTab;
   modalOpen: boolean;
   modalTab: ModalTab;
+  voiceMode: boolean;
+  artifactOpen: boolean;
+  artifactContent: string | null;
+  artifactType: string | null;
 }
 
 export interface SessionSummary {

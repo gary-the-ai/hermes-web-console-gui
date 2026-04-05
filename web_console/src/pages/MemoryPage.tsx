@@ -1,150 +1,117 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/api';
-import { MemoryList } from '../components/memory/MemoryList';
-
-interface MemoryResponse {
-  ok: boolean;
-  memory?: { content?: string };
-}
-
-interface UserProfileResponse {
-  ok: boolean;
-  user_profile?: { content?: string };
-}
-
-function parseMemoryLines(raw: string): Array<{ id: string; title: string; body: string }> {
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => ({
-      id: `mem-${btoa(unescape(encodeURIComponent(line))).slice(0, 16)}`,
-      title: 'Persistent memory',
-      body: line,
-    }));
-}
+import { toastStore } from '../store/toastStore';
+import { EmptyState } from '../components/shared/EmptyState';
 
 export function MemoryPage() {
-  const [memoryItems, setMemoryItems] = useState<Array<{ id: string; title: string; body: string }>>([]);
-  const [profileItems, setProfileItems] = useState<Array<{ id: string; title: string; body: string }>>([]);
-  const [activeTab, setActiveTab] = useState<'memory' | 'profile'>('memory');
+  const [content, setContent] = useState<string>('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const refreshMemory = async () => {
+  useEffect(() => {
+    loadMemory();
+  }, []);
+
+  const loadMemory = async () => {
+    setLoading(true);
     try {
-      const [memRes, profileRes] = await Promise.all([
-        apiClient.get<MemoryResponse>('/memory').catch(() => null),
-        apiClient.get<UserProfileResponse>('/user-profile').catch(() => null),
-      ]);
-      if (memRes?.ok && memRes.memory?.content) {
-        setMemoryItems(parseMemoryLines(memRes.memory.content));
+      const res = await apiClient.get<{ ok: boolean; content: string }>('/memory');
+      if (res.ok) {
+        setContent(res.content);
+        setEditContent(res.content);
       }
-      if (profileRes?.ok && profileRes.user_profile?.content) {
-        setProfileItems(
-          parseMemoryLines(profileRes.user_profile.content).map((item) => ({
-            ...item,
-            title: 'User profile',
-          }))
-        );
-      }
-    } catch {
-      // keep existing state
+    } catch (err) {
+      toastStore.error('Failed to load memory', err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    refreshMemory();
-  }, []);
-
-  const handleAddMemory = async (content: string) => {
-    await apiClient.post('/memory', { target: 'memory', content });
-    await refreshMemory();
+  const saveMemory = async () => {
+    try {
+      const res = await apiClient.post<{ ok: boolean }>('/memory', { content: editContent });
+      if (res.ok) {
+        setContent(editContent);
+        setIsEditing(false);
+        toastStore.success('Memory updated', 'Automatically synced to MEMORY.md');
+      }
+    } catch (err) {
+      toastStore.error('Failed to save memory', err instanceof Error ? err.message : String(err));
+    }
   };
 
-  const handleEditMemory = async (oldText: string, newText: string) => {
-    await apiClient.patch('/memory', { target: 'memory', old_text: oldText, content: newText });
-    await refreshMemory();
-  };
-
-  const handleDeleteMemory = async (text: string) => {
-    await apiClient.del('/memory', { target: 'memory', old_text: text });
-    await refreshMemory();
-  };
-
-  const handleAddProfile = async (content: string) => {
-    await apiClient.post('/memory', { target: 'user', content });
-    await refreshMemory();
-  };
-
-  const handleEditProfile = async (oldText: string, newText: string) => {
-    await apiClient.patch('/memory', { target: 'user', old_text: oldText, content: newText });
-    await refreshMemory();
-  };
-
-  const handleDeleteProfile = async (text: string) => {
-    await apiClient.del('/memory', { target: 'user', old_text: text });
-    await refreshMemory();
-  };
-
-  const tabStyle = (isActive: boolean): React.CSSProperties => ({
-    padding: '8px 16px',
-    cursor: 'pointer',
-    borderBottom: isActive ? '2px solid #818cf8' : '2px solid transparent',
-    color: isActive ? '#e2e8f0' : '#64748b',
-    fontWeight: isActive ? 600 : 400,
-    fontSize: '0.9rem',
-    background: 'transparent',
-    borderTop: 'none',
-    borderLeft: 'none',
-    borderRight: 'none',
-  });
+  if (loading) {
+    return <EmptyState title="Loading Memory..." description="Fetching core memories from DB..." icon="🧠" />;
+  }
 
   return (
-    <section style={{
-      background: 'rgba(255, 255, 255, 0.03)',
-      border: '1px solid rgba(255, 255, 255, 0.06)',
-      borderRadius: '16px',
-      padding: '16px',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '16px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
-        <button
-          type="button"
-          onClick={() => setActiveTab('memory')}
-          style={tabStyle(activeTab === 'memory')}
-        >
-          Session Memory
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('profile')}
-          style={tabStyle(activeTab === 'profile')}
-        >
-          User Profile
-        </button>
+    <div className="layout-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '2rem', overflow: 'hidden' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#f8fafc', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span>🧠</span> Agent Memory
+          </h2>
+          <p style={{ color: '#94a3b8', margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
+            What Hermes remembers about you and the workspace context across sessions.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          {isEditing ? (
+            <>
+              <button 
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditContent(content);
+                }}
+                style={{ padding: '0.5rem 1rem', background: 'transparent', border: '1px solid #475569', color: '#cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={saveMemory}
+                style={{ padding: '0.5rem 1rem', background: '#3b82f6', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 500 }}
+              >
+                Save Changes
+              </button>
+            </>
+          ) : (
+            <button 
+              onClick={() => setIsEditing(true)}
+              style={{ padding: '0.5rem 1rem', background: '#334155', border: 'none', color: '#f8fafc', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Edit Memory
+            </button>
+          )}
+        </div>
+      </header>
+
+      <div style={{ flex: 1, overflow: 'auto', background: '#0f172a', borderRadius: '8px', border: '1px solid #1e293b' }}>
+        {isEditing ? (
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            style={{
+              width: '100%',
+              height: '100%',
+              padding: '1.5rem',
+              background: 'transparent',
+              border: 'none',
+              color: '#e2e8f0',
+              fontFamily: 'monospace',
+              fontSize: '0.9rem',
+              resize: 'none',
+              lineHeight: 1.5,
+              outline: 'none'
+            }}
+            spellCheck="false"
+          />
+        ) : (
+          <div style={{ padding: '1.5rem', color: '#e2e8f0', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'monospace' }}>
+            {content || <span style={{ color: '#64748b', fontStyle: 'italic' }}>No memories recorded yet. The agent will add facts here automatically during conversations.</span>}
+          </div>
+        )}
       </div>
-
-      {activeTab === 'memory' && (
-        <MemoryList
-          title="🧠 Agent Episodic Memory"
-          description="Facts the agent has chosen to remember across sessions."
-          items={memoryItems}
-          onAdd={handleAddMemory}
-          onEdit={handleEditMemory}
-          onDelete={handleDeleteMemory}
-        />
-      )}
-
-      {activeTab === 'profile' && (
-        <MemoryList
-          title="👤 Explicit User Profile"
-          description="A dedicated profile for the agent outlining context, preferences, and details it knows about you."
-          items={profileItems}
-          onAdd={handleAddProfile}
-          onEdit={handleEditProfile}
-          onDelete={handleDeleteProfile}
-        />
-      )}
-    </section>
+    </div>
   );
 }
