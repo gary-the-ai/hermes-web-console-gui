@@ -1,294 +1,341 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { apiClient } from '../../lib/api';
 import { toastStore } from '../../store/toastStore';
 
-interface ModelInfo {
-  id: string;
-  description: string;
+/* ─── Types ────────────────────────────────────────────────────── */
+
+interface ProviderCard {
+  slug: string;
+  name: string;
+  is_current: boolean;
+  is_user_defined: boolean;
+  models: string[];
+  total_models: number;
+  source: string;
+  api_url?: string;
 }
 
-interface ProviderInfo {
-  id: string;
-  label: string;
-  aliases: string[];
-  authenticated: boolean;
-  models: ModelInfo[];
+interface CatalogResponse {
+  ok: boolean;
+  current_model: string;
+  current_provider: string;
+  current_provider_label: string;
+  providers: ProviderCard[];
 }
+
+interface SwitchResponse {
+  ok: boolean;
+  new_model: string;
+  provider: string;
+  provider_label: string;
+  provider_changed: boolean;
+  is_global: boolean;
+  context_window?: number;
+  max_output?: number;
+  cost?: string;
+  capabilities?: string;
+  cache_enabled?: boolean;
+  warning?: string;
+  resolved_via_alias?: string;
+  error?: string;
+}
+
+/* ─── Component ────────────────────────────────────────────────── */
 
 export function ModelPicker() {
-  const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [activeProvider, setActiveProvider] = useState<string>('');
-  const [activeModel, setActiveModel] = useState<string>('');
-  const [fallbackProviders, setFallbackProviders] = useState<string[]>([]);
+  const [providers, setProviders] = useState<ProviderCard[]>([]);
+  const [currentModel, setCurrentModel] = useState('');
+  const [currentProvider, setCurrentProvider] = useState('');
+  const [currentProviderLabel, setCurrentProviderLabel] = useState('');
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [customModel, setCustomModel] = useState('');
+  const [persistGlobal, setPersistGlobal] = useState(true);
+  const [switching, setSwitching] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchCatalog = async () => {
+  const fetchCatalog = useCallback(async () => {
     try {
-      const res = await apiClient.get<{ ok: boolean; providers: ProviderInfo[] }>('/models/catalog');
+      const res = await apiClient.get<CatalogResponse>('/models/catalog');
       if (res.ok) {
         setProviders(res.providers || []);
+        setCurrentModel(res.current_model || '');
+        setCurrentProvider(res.current_provider || '');
+        setCurrentProviderLabel(res.current_provider_label || '');
       }
     } catch (err) {
       toastStore.error('Catalog Load Failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const fetchActive = async () => {
-    try {
-      const res = await apiClient.get<{ ok: boolean; settings: any }>('/settings');
-      if (res.ok && res.settings) {
-        if (res.settings.model) {
-          setActiveProvider(res.settings.model.provider || '');
-          // The backend `run.py` prefers "default" first.
-          setActiveModel(res.settings.model.default || res.settings.model.model || res.settings.model.name || '');
-        }
-        if (Array.isArray(res.settings.fallback_providers)) {
-          setFallbackProviders(res.settings.fallback_providers);
-        }
-      }
-    } catch (err) {
-      toastStore.error('Active Model Load Failed', err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  useEffect(() => {
-    Promise.all([fetchCatalog(), fetchActive()]).finally(() => setLoading(false));
   }, []);
 
-  const handleSave = async (providerId: string, modelId: string) => {
-    setActiveProvider(providerId);
-    setActiveModel(modelId);
+  useEffect(() => { fetchCatalog(); }, [fetchCatalog]);
+
+  const handleSwitch = async (model: string, provider?: string) => {
+    if (!model && !provider) return;
+    setSwitching(true);
     try {
-      await apiClient.patch('/settings', {
-        // Must patch "default" since that is the canonical config key read by gateway and CLI
-        model: { provider: providerId, default: modelId, name: modelId }
+      const res = await apiClient.post<SwitchResponse>('/models/switch', {
+        model: model || '',
+        provider: provider || '',
+        global: persistGlobal,
       });
-      toastStore.success('Model Changed', `${modelId} on ${providerId}`);
+      if (res.ok) {
+        setCurrentModel(res.new_model);
+        setCurrentProvider(res.provider);
+        setCurrentProviderLabel(res.provider_label);
+
+        const parts = [`Switched to ${res.new_model}`];
+        if (res.provider_label) parts.push(`on ${res.provider_label}`);
+        if (res.context_window) parts.push(`• ${(res.context_window / 1000).toFixed(0)}K context`);
+        if (res.cost) parts.push(`• ${res.cost}`);
+        if (res.cache_enabled) parts.push('• Prompt caching enabled');
+        if (res.is_global) parts.push('• Saved to config');
+
+        toastStore.success('Model Switched', parts.join('\n'));
+        await fetchCatalog(); // refresh cards
+      } else {
+        toastStore.error('Switch Failed', res.error || 'Unknown error');
+      }
     } catch (err) {
-      toastStore.error('Failed to save model', err instanceof Error ? err.message : String(err));
+      toastStore.error('Switch Failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setSwitching(false);
     }
-  };
-
-  const handleSaveFallbacks = async (newFallbacks: string[]) => {
-    setFallbackProviders(newFallbacks);
-    try {
-      await apiClient.patch('/settings', { fallback_providers: newFallbacks });
-      toastStore.success('Fallback Chain Saved', `Chain length: ${newFallbacks.length}`);
-    } catch (err) {
-      toastStore.error('Failed to save fallbacks', err instanceof Error ? err.message : String(err));
-      fetchActive(); // revert
-    }
-  };
-
-  const moveFallback = (index: number, direction: -1 | 1) => {
-    const newFallbacks = [...fallbackProviders];
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= newFallbacks.length) return;
-    [newFallbacks[index], newFallbacks[targetIndex]] = [newFallbacks[targetIndex], newFallbacks[index]];
-    handleSaveFallbacks(newFallbacks);
-  };
-
-  const removeFallback = (index: number) => {
-    const newFallbacks = [...fallbackProviders];
-    newFallbacks.splice(index, 1);
-    handleSaveFallbacks(newFallbacks);
-  };
-
-  const addFallback = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    if (!val) return;
-    if (fallbackProviders.includes(val)) {
-      toastStore.error('Already in chain', `${val} is already a fallback provider`);
-      return;
-    }
-    handleSaveFallbacks([...fallbackProviders, val]);
-    e.target.value = ''; // reset select
   };
 
   if (loading) {
-    return <div style={{ padding: '24px', color: '#94a3b8' }}>Loading models...</div>;
+    return <div style={{ padding: '24px', color: '#94a3b8' }}>Loading model catalog…</div>;
   }
 
-  const selectedProvider = providers.find(p => p.id === activeProvider) || providers[0];
+  const activeProviderData = selectedProvider
+    ? providers.find(p => p.slug === selectedProvider)
+    : providers.find(p => p.is_current) || providers[0];
 
   return (
     <div style={{
       background: 'rgba(255,255,255,0.03)',
       border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: '8px',
+      borderRadius: '12px',
       padding: '24px',
-      marginBottom: '32px'
+      marginBottom: '32px',
     }}>
-      <h2 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span>🧠</span> Default Model & Provider
-      </h2>
-      <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 300px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: 500, color: '#e2e8f0' }}>
-            Provider
-          </label>
-          <select
-            value={activeProvider}
-            onChange={(e) => {
-              const newProviderId = e.target.value;
-              const newProvider = providers.find(p => p.id === newProviderId);
-              const newModelId = newProvider?.models?.[0]?.id || '';
-              handleSave(newProviderId, newModelId);
-            }}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              background: 'rgba(0,0,0,0.2)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#f8fafc',
-              borderRadius: '6px',
-              fontSize: '0.9rem'
-            }}
-          >
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label} {p.authenticated ? '(Ready)' : '(Setup required)'}
-              </option>
-            ))}
-          </select>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>🧠</span> Model & Provider
+        </h2>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '6px 14px',
+          background: 'rgba(56,189,248,0.1)',
+          border: '1px solid rgba(56,189,248,0.2)',
+          borderRadius: '20px',
+          fontSize: '0.8rem',
+          color: '#38bdf8',
+        }}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
+          {currentModel || 'No model'} — {currentProviderLabel}
         </div>
+      </div>
 
-        <div style={{ flex: '1 1 300px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: 500, color: '#e2e8f0' }}>
-            Model (Select from recommended)
-          </label>
-          <select
-            value={activeModel}
-            onChange={(e) => handleSave(activeProvider, e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              background: 'rgba(0,0,0,0.2)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#f8fafc',
-              borderRadius: '6px',
-              fontSize: '0.9rem'
-            }}
-          >
-            {selectedProvider?.models?.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.id} {m.description ? `(${m.description})` : ''}
-              </option>
-            ))}
-            {/* Fallback option if model isn't in catalog but is active */}
-            {!selectedProvider?.models?.find(m => m.id === activeModel) && activeModel && (
-              <option value={activeModel}>{activeModel} (Custom)</option>
-            )}
-          </select>
-
-          <label style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', marginBottom: '8px', fontSize: '0.875rem', fontWeight: 500, color: '#e2e8f0' }}>
-            <span>Or Enter Custom Model ID</span>
-            <button 
-              onClick={() => handleSave(activeProvider, activeModel)}
-              style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', fontSize: '0.8rem', padding: 0, fontWeight: 'bold' }}
-              title="Click to save custom model"
+      {/* Provider Cards */}
+      <label style={{ display: 'block', marginBottom: '10px', fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        Authenticated Providers ({providers.length})
+      </label>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+        gap: '10px',
+        marginBottom: '24px',
+      }}>
+        {providers.map(p => {
+          const isSelected = activeProviderData?.slug === p.slug;
+          return (
+            <button
+              key={p.slug}
+              onClick={() => setSelectedProvider(p.slug)}
+              style={{
+                background: isSelected
+                  ? 'rgba(56,189,248,0.12)'
+                  : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${isSelected ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                borderRadius: '10px',
+                padding: '14px 16px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease',
+                outline: 'none',
+              }}
             >
-              SAVE CUSTOM
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 600, color: isSelected ? '#38bdf8' : '#e2e8f0' }}>
+                  {p.name}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {p.is_current && (
+                  <span style={{
+                    fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px',
+                    background: 'rgba(34,197,94,0.15)', color: '#4ade80', fontWeight: 600,
+                  }}>ACTIVE</span>
+                )}
+                {p.is_user_defined && (
+                  <span style={{
+                    fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px',
+                    background: 'rgba(168,85,247,0.15)', color: '#c084fc', fontWeight: 600,
+                  }}>CUSTOM</span>
+                )}
+                <span style={{
+                  fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px',
+                  background: 'rgba(255,255,255,0.06)', color: '#94a3b8',
+                }}>
+                  {p.total_models > 0 ? `${p.total_models} models` : p.api_url ? 'endpoint' : '—'}
+                </span>
+              </div>
             </button>
-          </label>
+          );
+        })}
+      </div>
+
+      {/* Model Selection for Active Provider */}
+      {activeProviderData && (
+        <div style={{
+          background: 'rgba(0,0,0,0.15)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '10px',
+          padding: '20px',
+          marginBottom: '20px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', color: '#e2e8f0' }}>
+              {activeProviderData.name} Models
+            </h3>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              Click a model to switch instantly
+            </span>
+          </div>
+
+          {activeProviderData.models.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '280px', overflowY: 'auto' }}>
+              {activeProviderData.models.map(modelId => {
+                const isActive = modelId === currentModel && activeProviderData.slug === currentProvider;
+                return (
+                  <button
+                    key={modelId}
+                    onClick={() => handleSwitch(modelId, activeProviderData.slug)}
+                    disabled={switching}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '10px 14px',
+                      background: isActive ? 'rgba(56,189,248,0.08)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${isActive ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.04)'}`,
+                      borderRadius: '8px',
+                      cursor: switching ? 'wait' : 'pointer',
+                      transition: 'all 0.15s ease',
+                      outline: 'none',
+                      opacity: switching ? 0.6 : 1,
+                    }}
+                  >
+                    <span style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: '0.85rem',
+                      color: isActive ? '#38bdf8' : '#cbd5e1',
+                    }}>
+                      {modelId}
+                    </span>
+                    {isActive && (
+                      <span style={{
+                        fontSize: '0.65rem', padding: '2px 8px', borderRadius: '4px',
+                        background: 'rgba(34,197,94,0.15)', color: '#4ade80', fontWeight: 600,
+                      }}>
+                        CURRENT
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : activeProviderData.api_url ? (
+            <div style={{ color: '#64748b', fontSize: '0.875rem', fontStyle: 'italic' }}>
+              Custom endpoint: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>
+                {activeProviderData.api_url}
+              </code>
+            </div>
+          ) : (
+            <div style={{ color: '#64748b', fontSize: '0.875rem', fontStyle: 'italic' }}>
+              No curated models available for this provider.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Custom Model Input */}
+      <div style={{
+        background: 'rgba(0,0,0,0.1)',
+        border: '1px solid rgba(255,255,255,0.05)',
+        borderRadius: '10px',
+        padding: '16px 20px',
+        marginBottom: '16px',
+      }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Or Enter Any Model ID
+        </label>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
           <input
             type="text"
-            value={activeModel}
-            onChange={(e) => setActiveModel(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSave(activeProvider, activeModel); }}
-            placeholder="e.g. google/gemma-3-27b-it"
+            value={customModel}
+            onChange={e => setCustomModel(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && customModel.trim()) handleSwitch(customModel.trim(), selectedProvider || ''); }}
+            placeholder="e.g. sonnet, opus, google/gemma-3-27b-it"
             style={{
-              width: '100%',
+              flex: 1,
               padding: '10px 14px',
               background: 'rgba(0,0,0,0.3)',
-              border: '1px solid #38bdf855',
+              border: '1px solid rgba(255,255,255,0.08)',
               color: '#f8fafc',
-              borderRadius: '6px',
-              fontSize: '0.9rem'
+              borderRadius: '8px',
+              fontSize: '0.9rem',
+              fontFamily: "'JetBrains Mono', monospace",
+              outline: 'none',
             }}
           />
+          <button
+            onClick={() => { if (customModel.trim()) handleSwitch(customModel.trim(), selectedProvider || ''); }}
+            disabled={switching || !customModel.trim()}
+            style={{
+              padding: '10px 20px',
+              background: switching ? '#1e293b' : 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: switching ? 'wait' : 'pointer',
+              opacity: !customModel.trim() ? 0.4 : 1,
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {switching ? '⏳ Switching…' : '⚡ Switch'}
+          </button>
         </div>
       </div>
-      <p style={{ marginTop: '16px', fontSize: '0.875rem', color: '#94a3b8', lineHeight: 1.5 }}>
-        Select the default AI provider and model used for conversations and tool execution. Authentication is handled in the setup wizard or `<code style={{background:'rgba(0,0,0,0.3)', padding:'2px 4px', borderRadius:'4px'}}>~/.hermes/.env</code>`. To use a custom OpenRouter model, enter its exact ID in the text field and press Enter or Save.
-      </p>
 
-      <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.08)', margin: '24px 0' }} />
-
-      <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span>🔗</span> Fallback Provider Chain
-      </h3>
-      <p style={{ marginBottom: '16px', fontSize: '0.875rem', color: '#94a3b8', lineHeight: 1.5 }}>
-        If the primary provider fails (e.g. rate limit, server error), Hermes will automatically retry the request using providers in this chain, in order.
-      </p>
-      
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-        {fallbackProviders.length === 0 ? (
-          <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic', textAlign: 'center' }}>
-            No fallback providers configured.
-          </div>
-        ) : fallbackProviders.map((prov, i) => (
-          <div key={prov} style={{ 
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-            padding: '10px 14px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                background: 'rgba(255,255,255,0.1)', color: '#fff', width: '24px', height: '24px', borderRadius: '50%', fontSize: '0.75rem', fontWeight: 'bold' 
-              }}>
-                {i + 1}
-              </span>
-              <span style={{ color: '#e2e8f0', fontFamily: 'monospace' }}>{prov}</span>
-            </div>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button 
-                onClick={() => moveFallback(i, -1)} 
-                disabled={i === 0}
-                style={{ background: 'none', border: 'none', color: i === 0 ? '#475569' : '#94a3b8', cursor: i === 0 ? 'default' : 'pointer', padding: '4px' }}
-                title="Move Up"
-              >
-                ⬆️
-              </button>
-              <button 
-                onClick={() => moveFallback(i, 1)} 
-                disabled={i === fallbackProviders.length - 1}
-                style={{ background: 'none', border: 'none', color: i === fallbackProviders.length - 1 ? '#475569' : '#94a3b8', cursor: i === fallbackProviders.length - 1 ? 'default' : 'pointer', padding: '4px' }}
-                title="Move Down"
-              >
-                ⬇️
-              </button>
-              <button 
-                onClick={() => removeFallback(i)} 
-                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', marginLeft: '8px' }}
-                title="Remove"
-              >
-                ✖
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <select 
-          onChange={addFallback} 
-          defaultValue=""
-          style={{
-            flex: 1,
-            padding: '10px 14px',
-            background: 'rgba(0,0,0,0.2)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            color: '#f8fafc',
-            borderRadius: '6px',
-            fontSize: '0.9rem'
-          }}
-        >
-          <option value="" disabled>+ Add Provider to Chain...</option>
-          {providers.filter(p => !fallbackProviders.includes(p.id)).map(p => (
-            <option key={p.id} value={p.id}>{p.label}</option>
-          ))}
-        </select>
+      {/* Persistence Toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8' }}>
+          <input
+            type="checkbox"
+            checked={persistGlobal}
+            onChange={e => setPersistGlobal(e.target.checked)}
+            style={{ accentColor: '#6366f1' }}
+          />
+          Save to config.yaml (global)
+        </label>
+        <span style={{ fontSize: '0.75rem', color: '#475569' }}>
+          {persistGlobal ? 'Change persists across sessions' : 'Session-only — resets on restart'}
+        </span>
       </div>
     </div>
   );

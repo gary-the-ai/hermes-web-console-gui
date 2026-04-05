@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { apiClient } from '../../lib/api';
 import { toastStore } from '../../store/toastStore';
 import type { NavItem, PrimaryRoute } from '../../lib/types';
@@ -29,6 +29,26 @@ interface UpdateResponse {
   project_url: string;
 }
 
+interface ActiveModelResponse {
+  ok: boolean;
+  model: string;
+  provider: string;
+  provider_label: string;
+  context_window?: number;
+  cost?: string;
+  capabilities?: string;
+}
+
+interface SwitchResponse {
+  ok: boolean;
+  new_model: string;
+  provider: string;
+  provider_label: string;
+  context_window?: number;
+  cost?: string;
+  error?: string;
+}
+
 const NAV_ICONS: Record<string, string> = {
   chat: '💬',
   sessions: '📋',
@@ -39,11 +59,32 @@ const NAV_ICONS: Record<string, string> = {
   memory: '🧠'
 };
 
+const QUICK_MODELS = [
+  { alias: 'sonnet', label: 'Claude Sonnet', icon: '🟣' },
+  { alias: 'opus', label: 'Claude Opus', icon: '🟣' },
+  { alias: 'haiku', label: 'Claude Haiku', icon: '🟣' },
+  { alias: 'gpt', label: 'GPT (Latest)', icon: '🟢' },
+  { alias: 'gemini', label: 'Gemini', icon: '🔵' },
+  { alias: 'deepseek', label: 'DeepSeek', icon: '🔷' },
+  { alias: 'grok', label: 'Grok', icon: '⚫' },
+];
+
 export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSettings, onToggleDrawer, onToggleInspector, voiceMode, onToggleVoiceMode }: TopBarProps) {
   const [version, setVersion] = useState<string | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateResponse | null>(null);
+  const [activeModel, setActiveModel] = useState<ActiveModelResponse | null>(null);
+  const [quickSwitchOpen, setQuickSwitchOpen] = useState(false);
+  const [quickSwitching, setQuickSwitching] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const fetchActiveModel = useCallback(async () => {
+    try {
+      const res = await apiClient.get<ActiveModelResponse>('/models/active');
+      if (res.ok) setActiveModel(res);
+    } catch { /* silent */ }
+  }, []);
 
   useEffect(() => {
     apiClient.get<VersionResponse>('/version')
@@ -61,7 +102,21 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
         }
       })
       .catch(() => {});
-  }, []);
+
+    fetchActiveModel();
+  }, [fetchActiveModel]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!quickSwitchOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setQuickSwitchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [quickSwitchOpen]);
 
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true);
@@ -81,6 +136,31 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
       setCheckingUpdate(false);
     }
   };
+
+  const handleQuickSwitch = async (alias: string) => {
+    setQuickSwitching(alias);
+    try {
+      const res = await apiClient.post<SwitchResponse>('/models/switch', { model: alias, global: true });
+      if (res.ok) {
+        toastStore.success('Model Switched', `Now using ${res.new_model} on ${res.provider_label}`);
+        await fetchActiveModel();
+        setQuickSwitchOpen(false);
+      } else {
+        toastStore.error('Switch Failed', res.error || 'Unknown error');
+      }
+    } catch (err) {
+      toastStore.error('Switch Failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setQuickSwitching(null);
+    }
+  };
+
+  /* Compact model name for badge display */
+  const displayModel = activeModel?.model
+    ? activeModel.model.length > 32
+      ? activeModel.model.split('/').pop() || activeModel.model
+      : activeModel.model
+    : null;
 
   return (
     <header className="topbar">
@@ -109,6 +189,96 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
           <span className="topbar-profile-badge">
             {activeProfile}
           </span>
+        )}
+
+        {/* Model Indicator */}
+        {displayModel && (
+          <div ref={dropdownRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setQuickSwitchOpen(!quickSwitchOpen)}
+              title={`Active: ${activeModel?.model} on ${activeModel?.provider_label}\nClick for quick switch`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '3px 10px',
+                background: quickSwitchOpen ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${quickSwitchOpen ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: '14px',
+                color: '#94a3b8',
+                fontSize: '0.72rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                fontFamily: "'JetBrains Mono', monospace",
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+              {displayModel}
+              <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>▼</span>
+            </button>
+
+            {/* Quick Switch Dropdown */}
+            {quickSwitchOpen && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                left: 0,
+                minWidth: '220px',
+                background: '#1e1e2e',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '10px',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                zIndex: 1000,
+                overflow: 'hidden',
+                animation: 'fadeInDown 0.15s ease-out',
+              }}>
+                <div style={{
+                  padding: '10px 14px 6px',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  color: '#64748b',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}>
+                  Quick Switch
+                </div>
+                {QUICK_MODELS.map(qm => (
+                  <button
+                    key={qm.alias}
+                    onClick={() => handleQuickSwitch(qm.alias)}
+                    disabled={quickSwitching !== null}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      width: '100%',
+                      padding: '10px 14px',
+                      background: quickSwitching === qm.alias ? 'rgba(99,102,241,0.1)' : 'transparent',
+                      border: 'none',
+                      color: '#e2e8f0',
+                      fontSize: '0.85rem',
+                      cursor: quickSwitching ? 'wait' : 'pointer',
+                      textAlign: 'left',
+                      transition: 'background 0.1s',
+                      opacity: quickSwitching && quickSwitching !== qm.alias ? 0.4 : 1,
+                    }}
+                    onMouseEnter={e => { if (!quickSwitching) (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                    onMouseLeave={e => { if (!quickSwitching) (e.target as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <span>{qm.icon}</span>
+                    <span style={{ flex: 1 }}>{qm.label}</span>
+                    {quickSwitching === qm.alias && <span style={{ fontSize: '0.75rem' }}>⏳</span>}
+                  </button>
+                ))}
+                <div style={{
+                  borderTop: '1px solid rgba(255,255,255,0.06)',
+                  padding: '8px 14px',
+                  fontSize: '0.7rem',
+                  color: '#475569',
+                  textAlign: 'center',
+                }}>
+                  Open Settings for full catalog
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

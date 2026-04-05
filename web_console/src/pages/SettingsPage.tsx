@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/api';
 import { SettingsForm, type SettingCategory } from '../components/settings/SettingsForm';
 import { ModelPicker } from '../components/settings/ModelPicker';
+import { ProviderManager } from '../components/settings/ProviderManager';
 import { ApiKeyManager } from '../components/settings/ApiKeyManager';
 import { ProfileManager } from '../components/settings/ProfileManager';
 import { PluginList } from '../components/settings/PluginList';
@@ -199,6 +200,7 @@ export function SettingsPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '800px', margin: '0 auto' }}>
       <ThemeSettings />
       <ModelPicker />
+      <ProviderManager />
       {categories && <SettingsForm categories={categories} onSave={handleSave} />}
       <ApiKeyManager />
       <ProfileManager />

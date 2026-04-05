@@ -129,3 +129,16 @@ Contributions are massively appreciated! Whether it's connecting deeper endpoint
 
 ## ⚖️ License
 Distributed under the MIT License. See `LICENSE` for more information. Built originally off the fantastic [Nous Research](https://nousresearch.com) stack.
+
+---
+
+## 📜 Changelog
+
+### [2026.4.5] - Provider Configs & Upstream Sync
+- **Backend Sync**: Decoupled `models_api` hardcoded catalog. Subscribes completely to upstream `list_authenticated_providers()`.
+- **Global Model Store**: Enabled settings sync into `~/.hermes/config.yaml` using dynamic provider detection. 
+- **TopBar Upgrade**: Included visually-striking Dropdown containing active model aliasing & quick-switches instantly mid-session.
+- **ProviderManager**: Visual CRUD capabilities to inject localized LocalAI/vLLM endpoints seamlessly.
+
+---
+Built by developers who love beautiful terminals, for developers who want more than a terminal. ✨
