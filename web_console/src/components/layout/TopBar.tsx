@@ -196,7 +196,7 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
           <div ref={dropdownRef} style={{ position: 'relative' }}>
             <button
               onClick={() => setQuickSwitchOpen(!quickSwitchOpen)}
-              title={`Active: ${activeModel?.model} on ${activeModel?.provider_label}\nClick for quick switch`}
+              title={`Active: ${activeModel?.model} on ${activeModel?.provider_label}${activeModel?.cost ? `\nCost: ${activeModel.cost}` : ''}${activeModel?.capabilities ? `\nCapabilities: ${activeModel.capabilities}` : ''}\nClick for quick switch`}
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '3px 10px',
@@ -213,6 +213,11 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
             >
               <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
               {displayModel}
+              {activeModel?.cost && (
+                <span style={{ fontSize: '0.62rem', color: '#64748b', borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '6px', marginLeft: '2px' }}>
+                  {activeModel.cost.split(',')[0]}
+                </span>
+              )}
               <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>▼</span>
             </button>
 
@@ -222,7 +227,7 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
                 position: 'absolute',
                 top: 'calc(100% + 6px)',
                 left: 0,
-                minWidth: '220px',
+                minWidth: '240px',
                 background: '#1e1e2e',
                 border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: '10px',
@@ -231,15 +236,26 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
                 overflow: 'hidden',
                 animation: 'fadeInDown 0.15s ease-out',
               }}>
-                <div style={{
-                  padding: '10px 14px 6px',
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  color: '#64748b',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                }}>
-                  Quick Switch
+                <div style={{ padding: '10px 14px 4px' }}>
+                  <div style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    color: '#64748b',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                  }}>
+                    Quick Switch
+                  </div>
+                  {activeModel?.cost && (
+                    <div style={{
+                      fontSize: '0.65rem',
+                      color: '#475569',
+                      marginTop: '3px',
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}>
+                      💰 {activeModel.cost}
+                    </div>
+                  )}
                 </div>
                 {QUICK_MODELS.map(qm => (
                   <button

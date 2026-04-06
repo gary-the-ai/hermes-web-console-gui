@@ -4,6 +4,7 @@ import { toastStore } from '../store/toastStore';
 import { SkillList } from '../components/skills/SkillList';
 import { SkillHubSearch } from '../components/skills/SkillHubSearch';
 import { SkillEditor } from '../components/skills/SkillEditor';
+import { SkillConfigPanel } from '../components/skills/SkillConfigPanel';
 
 interface SkillSummary {
   name: string;
@@ -96,7 +97,7 @@ export function SkillsPage() {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<'storefront' | 'installed'>('storefront');
+  const [activeTab, setActiveTab] = useState<'storefront' | 'installed' | 'config'>('storefront');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -159,6 +160,22 @@ export function SkillsPage() {
         >
           📦 Installed & Local
         </button>
+        <button
+          onClick={() => setActiveTab('config')}
+          style={{
+            padding: '10px 4px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'config' ? '2px solid #818cf8' : '2px solid transparent',
+            color: activeTab === 'config' ? '#f8fafc' : '#94a3b8',
+            fontSize: '1rem',
+            fontWeight: activeTab === 'config' ? 600 : 400,
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          ⚙️ Configuration
+        </button>
       </div>
 
       {activeTab === 'storefront' && (
@@ -174,6 +191,10 @@ export function SkillsPage() {
           onUnload={handleUnload}
           onViewDetail={handleViewDetail}
         />
+      )}
+
+      {activeTab === 'config' && (
+        <SkillConfigPanel />
       )}
 
       {isEditorOpen && (

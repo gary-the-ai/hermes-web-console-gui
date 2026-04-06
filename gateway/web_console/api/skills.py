@@ -214,11 +214,72 @@ async def handle_skill_create(request: web.Request) -> web.Response:
     except Exception as exc:
         return _json_error(status=500, code="create_error", message=str(exc))
 
+async def handle_skill_config_vars(request: web.Request) -> web.Response:
+    """GET /api/gui/skills/config — list all skill config variables with current values."""
+    try:
+        from agent.skill_utils import discover_all_skill_config_vars, resolve_skill_config_values
+        config_vars = discover_all_skill_config_vars()
+        values = resolve_skill_config_values(config_vars)
+        items = []
+        for var in config_vars:
+            items.append({
+                "key": var["key"],
+                "description": var["description"],
+                "default": var.get("default"),
+                "prompt": var.get("prompt"),
+                "skill": var.get("skill"),
+                "value": values.get(var["key"]),
+            })
+        return web.json_response({"ok": True, "config_vars": items, "count": len(items)})
+    except Exception as exc:
+        return _json_error(status=500, code="config_vars_failed", message=str(exc))
+
+
+async def handle_skill_config_save(request: web.Request) -> web.Response:
+    """POST /api/gui/skills/config — save a skill config variable value."""
+    data = await _read_json_body(request)
+    if not data or "key" not in data or "value" not in data:
+        return _json_error(status=400, code="invalid_request", message="Missing 'key' or 'value'")
+    key = str(data["key"]).strip()
+    value = data["value"]
+    if not key:
+        return _json_error(status=400, code="invalid_key", message="Config key must be non-empty")
+    try:
+        from agent.skill_utils import SKILL_CONFIG_PREFIX
+        from hermes_constants import get_hermes_home
+        import yaml
+
+        config_path = get_hermes_home() / "config.yaml"
+        config = {}
+        if config_path.exists():
+            raw = config_path.read_text(encoding="utf-8")
+            parsed = yaml.safe_load(raw)
+            if isinstance(parsed, dict):
+                config = parsed
+
+        # Navigate to the storage path: skills.config.<key>
+        storage_key = f"{SKILL_CONFIG_PREFIX}.{key}"
+        parts = storage_key.split(".")
+        current = config
+        for part in parts[:-1]:
+            if part not in current or not isinstance(current.get(part), dict):
+                current[part] = {}
+            current = current[part]
+        current[parts[-1]] = value
+
+        config_path.write_text(yaml.dump(config, default_flow_style=False), encoding="utf-8")
+        return web.json_response({"ok": True, "key": key, "value": value})
+    except Exception as exc:
+        return _json_error(status=500, code="config_save_failed", message=str(exc))
+
+
 def register_skills_api_routes(app: web.Application) -> None:
     if app.get(SKILLS_SERVICE_APP_KEY) is None:
         app[SKILLS_SERVICE_APP_KEY] = SkillService()
 
     app.router.add_get("/api/gui/skills", handle_list_skills)
+    app.router.add_get("/api/gui/skills/config", handle_skill_config_vars)
+    app.router.add_post("/api/gui/skills/config", handle_skill_config_save)
     app.router.add_get("/api/gui/skills/hub/search", handle_hub_search)
     app.router.add_post("/api/gui/skills/hub/install", handle_hub_install)
     app.router.add_post("/api/gui/skills/create", handle_skill_create)
@@ -226,3 +287,4 @@ def register_skills_api_routes(app: web.Application) -> None:
     app.router.add_post("/api/gui/skills/{name}/load", handle_load_skill)
     app.router.add_get("/api/gui/skills/session/{session_id}", handle_list_session_skills)
     app.router.add_delete("/api/gui/skills/session/{session_id}/{name}", handle_unload_skill)
+
