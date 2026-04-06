@@ -135,6 +135,12 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 
 ## 📜 Changelog
 
+### [2026.4.6a] - Skill Configuration & Logs Improvements
+- **Skill Configuration UI**: Added a dedicated "⚙️ Configuration" tab to the Skills Hub. Includes a robust interface for reading and writing skill-specific configuration variables (e.g., `wiki.path`) back to `config.yaml` using new backend settings endpoints.
+- **Upgraded Logs Viewer**: Overhauled the `LogsPage` with multi-file selection (agent, gateway, and errors), color-coded log-level visualization, and dropdown level filtering. 
+- **Header Additions**: Integrated live API token usage pricing metrics into the top status bar.
+- **Upstream Sync**: Safely merged 69+ upstream commits from `NousResearch/hermes-agent`, ensuring the GUI retains absolute tracking parity.
+
 ### [2026.4.5c] - Upstream Sync & Analytics Dashboard
 - **Upstream Merge**: Synced 52 commits from `NousResearch/hermes-agent` main branch. Resolved merge conflict in `run_agent.py` (structured `tool_progress_callback` signature change).
 - **Analytics Dashboard**: New "Analytics & Insights" tab in Control Center powered by `recharts`. Visualizes session history, token usage, cost breakdowns, tool invocation distribution, and activity streaks.
