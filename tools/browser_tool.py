@@ -895,6 +895,10 @@ def _run_browser_command(
         command
     ] + args
     
+    if not session_info.get("cdp_url"):
+        cmd_parts.append("--chrome-args=--remote-debugging-port=9222")
+
+    
     try:
         # Give each task its own socket directory to prevent concurrency conflicts.
         # Without this, parallel workers fight over the same default socket path,
