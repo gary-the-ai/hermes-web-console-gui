@@ -42,7 +42,7 @@ _EXTRA_ENV_KEYS = frozenset({
     "TERMINAL_ENV", "TERMINAL_SSH_KEY", "TERMINAL_SSH_PORT",
     "WHATSAPP_MODE", "WHATSAPP_ENABLED",
     "MATTERMOST_HOME_CHANNEL", "MATTERMOST_REPLY_MODE",
-    "MATRIX_PASSWORD", "MATRIX_ENCRYPTION", "MATRIX_HOME_ROOM",
+    "MATRIX_PASSWORD", "MATRIX_ENCRYPTION", "MATRIX_DEVICE_ID", "MATRIX_HOME_ROOM",
     "MATRIX_REQUIRE_MENTION", "MATRIX_FREE_RESPONSE_ROOMS", "MATRIX_AUTO_THREAD",
 })
 import yaml
@@ -1089,6 +1089,14 @@ OPTIONAL_ENV_VARS = {
         "category": "messaging",
         "advanced": True,
     },
+    "MATRIX_DEVICE_ID": {
+        "description": "Stable Matrix device ID for E2EE persistence across restarts (e.g. HERMES_BOT)",
+        "prompt": "Matrix device ID (stable across restarts)",
+        "url": None,
+        "password": False,
+        "category": "messaging",
+        "advanced": True,
+    },
     "GATEWAY_ALLOW_ALL_USERS": {
         "description": "Allow all users to interact with messaging bots (true/false). Default: false.",
         "prompt": "Allow all users (true/false)",
@@ -1927,6 +1935,24 @@ def _normalize_max_turns_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 
+def read_raw_config() -> Dict[str, Any]:
+    """Read ~/.hermes/config.yaml as-is, without merging defaults or migrating.
+
+    Returns the raw YAML dict, or ``{}`` if the file doesn't exist or can't
+    be parsed.  Use this for lightweight config reads where you just need a
+    single value and don't want the overhead of ``load_config()``'s deep-merge
+    + migration pipeline.
+    """
+    try:
+        config_path = get_config_path()
+        if config_path.exists():
+            with open(config_path, encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+    except Exception:
+        pass
+    return {}
+
+
 def load_config() -> Dict[str, Any]:
     """Load configuration from ~/.hermes/config.yaml."""
     import copy
@@ -1978,8 +2004,8 @@ _FALLBACK_COMMENT = """
 #
 # Supported providers:
 #   openrouter   (OPENROUTER_API_KEY)  — routes to any model
-#   openai-codex (OAuth — hermes login) — OpenAI Codex
-#   nous         (OAuth — hermes login) — Nous Portal
+#   openai-codex (OAuth — hermes auth) — OpenAI Codex
+#   nous         (OAuth — hermes auth) — Nous Portal
 #   zai          (ZAI_API_KEY)         — Z.AI / GLM
 #   kimi-coding  (KIMI_API_KEY)        — Kimi / Moonshot
 #   minimax      (MINIMAX_API_KEY)     — MiniMax
@@ -2021,8 +2047,8 @@ _COMMENTED_SECTIONS = """
 #
 # Supported providers:
 #   openrouter   (OPENROUTER_API_KEY)  — routes to any model
-#   openai-codex (OAuth — hermes login) — OpenAI Codex
-#   nous         (OAuth — hermes login) — Nous Portal
+#   openai-codex (OAuth — hermes auth) — OpenAI Codex
+#   nous         (OAuth — hermes auth) — Nous Portal
 #   zai          (ZAI_API_KEY)         — Z.AI / GLM
 #   kimi-coding  (KIMI_API_KEY)        — Kimi / Moonshot
 #   minimax      (MINIMAX_API_KEY)     — MiniMax
@@ -2566,7 +2592,7 @@ def set_config_value(key: str, value: str):
         'TINKER_API_KEY',
     ]
     
-    if key.upper() in api_keys or key.upper().endswith('_API_KEY') or key.upper().endswith('_TOKEN') or key.upper().startswith('TERMINAL_SSH'):
+    if key.upper() in api_keys or key.upper().endswith(('_API_KEY', '_TOKEN')) or key.upper().startswith('TERMINAL_SSH'):
         save_env_value(key.upper(), value)
         print(f"✓ Set {key} in {get_env_path()}")
         return
