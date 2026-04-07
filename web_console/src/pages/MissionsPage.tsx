@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface KanbanCard {
   id: string;
@@ -35,6 +35,32 @@ export function MissionsPage() {
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [isInitializing, setIsInitializing] = useState(true);
+  const saveTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    fetch('/api/gui/missions')
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok && data.columns) {
+          setColumns(data.columns);
+        }
+      })
+      .catch(err => console.error("Failed to load missions:", err))
+      .finally(() => setIsInitializing(false));
+  }, []);
+
+  const saveColumns = (newCols: KanbanColumn[]) => {
+    setColumns(newCols);
+    if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = window.setTimeout(() => {
+      fetch('/api/gui/missions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columns: newCols })
+      }).catch(err => console.error("Failed to save missions:", err));
+    }, 500);
+  };
 
   const addCard = (columnId: string) => {
     if (!newTitle.trim()) return;
@@ -44,7 +70,7 @@ export function MissionsPage() {
       description: newDesc.trim(),
       priority: newPriority,
     };
-    setColumns(cols => cols.map(col =>
+    saveColumns(columns.map(col =>
       col.id === columnId ? { ...col, cards: [...col.cards, card] } : col
     ));
     setNewTitle('');
@@ -54,7 +80,7 @@ export function MissionsPage() {
   };
 
   const removeCard = (columnId: string, cardId: string) => {
-    setColumns(cols => cols.map(col =>
+    saveColumns(columns.map(col =>
       col.id === columnId ? { ...col, cards: col.cards.filter(c => c.id !== cardId) } : col
     ));
   };
@@ -69,22 +95,22 @@ export function MissionsPage() {
     if (fromColumnId === toColumnId) { setDraggedCard(null); return; }
 
     let movedCard: KanbanCard | undefined;
-    setColumns(cols => {
-      const updated = cols.map(col => {
-        if (col.id === fromColumnId) {
-          const card = col.cards.find(c => c.id === cardId);
-          if (card) movedCard = card;
-          return { ...col, cards: col.cards.filter(c => c.id !== cardId) };
-        }
-        return col;
-      });
-      if (movedCard) {
-        return updated.map(col =>
-          col.id === toColumnId ? { ...col, cards: [...col.cards, movedCard!] } : col
-        );
+    const updated = columns.map(col => {
+      if (col.id === fromColumnId) {
+        const card = col.cards.find(c => c.id === cardId);
+        if (card) movedCard = card;
+        return { ...col, cards: col.cards.filter(c => c.id !== cardId) };
       }
-      return updated;
+      return col;
     });
+    
+    if (movedCard) {
+      saveColumns(updated.map(col =>
+        col.id === toColumnId ? { ...col, cards: [...col.cards, movedCard!] } : col
+      ));
+    } else {
+      saveColumns(updated);
+    }
     setDraggedCard(null);
   };
 
@@ -95,7 +121,7 @@ export function MissionsPage() {
         <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Drag cards between columns to update status</span>
       </div>
 
-      <div style={{ display: 'flex', gap: '16px', flex: 1, overflowX: 'auto', paddingBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '16px', flex: 1, overflowX: 'auto', paddingBottom: '16px', opacity: isInitializing ? 0.5 : 1, transition: 'opacity 0.2s' }}>
         {columns.map(col => (
           <div
             key={col.id}
