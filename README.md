@@ -45,6 +45,12 @@ Here is a glimpse of the gorgeous new interfaces powering your agent:
 ## 🌟 Enhanced Features
 - **Live SSE Token Streaming**: True GPT-style typewriter rendering connecting directly to the core Hermes API Event Stream (`message.assistant.delta`).
 - **xterm.js Interactive Sandbox**: Execute native CLI tasks and inspect live runtime logs entirely from a drawer nested within your browser. No separate windows required.
+- **Dashboard Command Center**: Real-time observability dashboard streaming CPU, memory, Process, and Cron active metrics directly from the host.
+- **CLI Session Bridge**: Seamlessly view and interact with CLI terminal sessions and memory straight from the web console.
+- **Offline Portable Mode**: Fallback to local offline mode with graceful degradation when the backend is unreachable. 
+- **Missions Kanban**: Create, drag-and-drop, and monitor agentic missions on a comprehensive visual board.
+- **Workspace Integration**: Mentioning files with `@` directly links to your file explorer context. Rich dropzones power native vision multi-modal interactions.
+- **PWA Support**: Full manifest and service worker deployment for native standalone app-like installations across Desktop and Mobile.
 - **Git-Style Inline Diffs**: Real-time syntax-highlighted visualizations when the agent touches your workspace files.
 - **Visual Configurations**: Completely avoid manually touching `config.yaml`.
   - **Fallback Provider Chains**: Build complex failover LLM logic securely with a drag-and-drop sortable GUI list.
@@ -134,6 +140,16 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 ---
 
 ## 📜 Changelog
+
+### [2026.4.7] - GUI Modernization & Kanban Integrations
+- **Missions Kanban Board**: New `/missions` overarching route providing an intuitive HTML5 drag-and-drop interface for managing agent tasks with Backlog, In Progress, Review, and Done columns.
+- **Dashboard Command Center**: Live-polling global interface tracking CPU limits, host memory footprint, active Cron Jobs, and background operations in real-time.
+- **CLI Session Bridge**: Sessions viewer now imports and segregates interactions made natively in the CLI vs the Web UI via SQLite reads.
+- **Rich Vision Input**: Added glow-visualized drag-and-drop dropzones over the main chat composer to securely facilitate image context streaming.
+- **Workspace File @Mentions**: Introduced an elegant native popup autocomplete inside the chat composer. Type `@` to select local workspace files to be injected efficiently into context.
+- **Portable Mode (Backend Agnostic)**: The UI now degrades gracefully when the Hermes core backend is down, exposing a red health banner instead of crashing the interface with 500s.
+- **PWA Installation**: Fully initialized `manifest.json`, local `<link>` tags, generated icon sets, and an offline-ready `sw.js` Service Worker to run Hermes natively on any Desktop or device.
+- **Docker Strategy**: Created standalone `Dockerfile.frontend` and `Dockerfile.backend` setups composed via `docker-compose.yml` to instantly spin up the proxy architectures seamlessly.
 
 ### [2026.4.6a] - Skill Configuration & Logs Improvements
 - **Skill Configuration UI**: Added a dedicated "⚙️ Configuration" tab to the Skills Hub. Includes a robust interface for reading and writing skill-specific configuration variables (e.g., `wiki.path`) back to `config.yaml` using new backend settings endpoints.
