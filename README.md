@@ -42,6 +42,18 @@ Here is a glimpse of the gorgeous new interfaces powering your agent:
 ![Skills Hub](assets/screenshots/skills_hub.png)
 </details>
 
+<details>
+<summary><b>📊 Analytics & Insights Dashboard</b></summary>
+
+![Analytics Dashboard](assets/screenshots/analytics.png)
+</details>
+
+<details>
+<summary><b>🗺️ Missions Kanban Tracker</b></summary>
+
+![Missions Kanban](assets/screenshots/missions.png)
+</details>
+
 ## 🌟 Enhanced Features
 - **Live SSE Token Streaming**: True GPT-style typewriter rendering connecting directly to the core Hermes API Event Stream (`message.assistant.delta`).
 - **xterm.js Interactive Sandbox**: Execute native CLI tasks and inspect live runtime logs entirely from a drawer nested within your browser. No separate windows required.
@@ -140,6 +152,11 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 ---
 
 ## 📜 Changelog
+
+### [2026.4.8] - Layout & Responsive Redesign
+- **Workspace Layout Redesign**: Converted the previously static left (Workspace) and right (Inspector) sidebars to fully collapsible native column layouts protecting viewport dimensions.
+- **Responsive Top Navigation**: Added seamless scroll-snapping and dynamic flex-wrapping to the header toolbar preserving accessibility on narrow viewports without overlapping controls.
+- **UI Overflow Fixes**: Stabilized memory headers and logs filters with flex-wrap boundaries preventing collision on smaller screens. 
 
 ### [2026.4.7] - GUI Modernization & Kanban Integrations
 - **Missions Kanban Board**: New `/missions` overarching route providing an intuitive HTML5 drag-and-drop interface for managing agent tasks with Backlog, In Progress, Review, and Done columns.
