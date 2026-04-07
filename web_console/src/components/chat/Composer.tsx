@@ -1,4 +1,14 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { apiClient } from '../../lib/api';
+
+interface WorkspaceTreeNode { name: string; path: string; type: 'file' | 'directory'; children?: WorkspaceTreeNode[]; }
+interface WorkspaceTreeResponse { ok: boolean; tree: WorkspaceTreeNode; }
+
+function flattenTree(node: WorkspaceTreeNode | undefined): string[] {
+  if (!node) return [];
+  if (node.type === 'file') return [node.path];
+  return (node.children ?? []).flatMap((child) => flattenTree(child));
+}
 
 export interface AttachedFile {
   file: File;
@@ -58,6 +68,7 @@ const SLASH_COMMANDS: { name: string; description: string }[] = [
 
 export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange }: ComposerProps) {
   const [prompt, setPrompt] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isBackground, setIsBackground] = useState(false);
@@ -65,6 +76,12 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedSlashIndex, setSelectedSlashIndex] = useState(0);
+  
+  const [showMentionMenu, setShowMentionMenu] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+  const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([]);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -75,14 +92,23 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
     ? SLASH_COMMANDS.filter(c => c.name.startsWith('/' + slashFilter))
     : SLASH_COMMANDS;
 
+  const filteredMentions = mentionFilter
+    ? workspaceFiles.filter(f => f.toLowerCase().includes(mentionFilter.toLowerCase())).slice(0, 50)
+    : workspaceFiles.slice(0, 50);
+
   // Reset selection when filter changes
   useEffect(() => {
     setSelectedSlashIndex(0);
   }, [slashFilter]);
 
+  useEffect(() => {
+    setSelectedMentionIndex(0);
+  }, [mentionFilter]);
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setShowSlashMenu(false);
+    setShowMentionMenu(false);
     let message = prompt.trim();
     if (!message && attachments.length === 0) return;
     const currentAttachments = [...attachments];
@@ -161,10 +187,51 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
     }
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    
+    const newAttachments: AttachedFile[] = [];
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const type = file.type.startsWith('image/') ? 'image'
+          : file.type.startsWith('audio/') ? 'audio'
+          : 'other';
+        const previewUrl = type === 'image' ? URL.createObjectURL(file) : '';
+        newAttachments.push({ file, previewUrl, type });
+    }
+    setAttachments((prev) => [...prev, ...newAttachments]);
+  };
+
   const handleSlashSelect = (cmd: string) => {
     setPrompt(cmd + ' ');
     setShowSlashMenu(false);
     setSlashFilter('');
+  };
+
+  const handleMentionSelect = (path: string) => {
+    const filename = path.split('/').pop() || path;
+    const replacement = `[${filename}](${path}) `;
+    const newPrompt = prompt.replace(/@\S*$/, replacement);
+    setPrompt(newPrompt);
+    setShowMentionMenu(false);
+    setMentionFilter('');
   };
 
   const handlePromptChange = (value: string) => {
@@ -182,11 +249,62 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
     } else {
       setShowSlashMenu(false);
     }
+    
+    // Check for @mentions
+    const atMatch = value.match(/(?:^|\s)@(\S*)$/);
+    if (atMatch) {
+      setMentionFilter(atMatch[1]);
+      setShowMentionMenu(true);
+      if (workspaceFiles.length === 0) {
+        apiClient.get<WorkspaceTreeResponse>('/workspace/tree').then(res => {
+          if (res.ok) setWorkspaceFiles(flattenTree(res.tree));
+        }).catch(() => {});
+      }
+    } else {
+      setShowMentionMenu(false);
+    }
   };
 
   return (
     <div style={{ width: '100%', padding: '0 20px 20px' }}>
-      <form className="composer" aria-label="Composer" onSubmit={handleSubmit} style={{ margin: '0 auto', maxWidth: '800px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+      <form 
+        className="composer" 
+        aria-label="Composer" 
+        onSubmit={handleSubmit} 
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        style={{ 
+          margin: '0 auto', 
+          maxWidth: '800px', 
+          position: 'relative', 
+          display: 'flex', 
+          flexDirection: 'column',
+          boxShadow: isDragOver ? '0 0 0 2px #c084fc' : 'none',
+          borderRadius: '24px',
+          transition: 'box-shadow 0.2s ease',
+        }}
+      >
+        {isDragOver && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(192, 132, 252, 0.1)',
+            backdropFilter: 'blur(4px)',
+            borderRadius: '24px',
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#c084fc',
+            fontSize: '1.2rem',
+            fontWeight: 600,
+            pointerEvents: 'none'
+          }}>
+            Drop files here...
+          </div>
+        )}
         
         {/* Attachment Preview Strip */}
         {attachments.length > 0 && (
@@ -292,6 +410,60 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
           </div>
         )}
 
+        {/* Mention autocomplete menu */}
+        {showMentionMenu && filteredMentions.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: '40px',
+              maxWidth: '400px',
+              maxHeight: '280px',
+              overflowY: 'auto',
+              background: 'rgba(24, 24, 27, 0.98)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '12px',
+              padding: '6px',
+              marginBottom: '4px',
+              backdropFilter: 'blur(16px)',
+              boxShadow: '0 -8px 32px rgba(0,0,0,0.4)',
+              zIndex: 101,
+            }}
+          >
+            <div style={{ padding: '4px 10px 8px', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              File Mentions
+            </div>
+            {filteredMentions.map((path, i) => (
+              <button
+                key={path}
+                type="button"
+                onClick={() => handleMentionSelect(path)}
+                onMouseEnter={() => setSelectedMentionIndex(i)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  width: '100%',
+                  padding: '8px 10px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  background: i === selectedMentionIndex ? 'rgba(129, 140, 248, 0.15)' : 'transparent',
+                  textAlign: 'left',
+                  transition: 'background 0.1s',
+                }}
+              >
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f4f4f5' }}>
+                  {path.split('/').pop()}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                  {path}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '24px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px', backdropFilter: 'blur(8px)' }}>
           <input
             ref={fileInputRef}
@@ -335,6 +507,28 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
                 if (e.key === 'Escape') {
                   e.preventDefault();
                   setShowSlashMenu(false);
+                  return;
+                }
+              }
+              if (showMentionMenu && filteredMentions.length > 0) {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setSelectedMentionIndex(prev => Math.min(prev + 1, filteredMentions.length - 1));
+                  return;
+                }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setSelectedMentionIndex(prev => Math.max(prev - 1, 0));
+                  return;
+                }
+                if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+                  e.preventDefault();
+                  handleMentionSelect(filteredMentions[selectedMentionIndex]);
+                  return;
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setShowMentionMenu(false);
                   return;
                 }
               }

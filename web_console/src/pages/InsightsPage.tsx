@@ -5,6 +5,16 @@ import {
 } from 'recharts';
 import './InsightsPage.css';
 
+interface GlobalMetrics {
+  token_usage_today: number;
+  cost_today: number;
+  active_processes: number;
+  cron_jobs: number;
+  cpu_percent: number;
+  memory_percent: number;
+  uptime_seconds: number;
+}
+
 interface InsightsReport {
   empty: boolean;
   days: number;
@@ -33,9 +43,33 @@ const COLORS = ['#4dabf7', '#69db7c', '#ff8787', '#ffd43b', '#da77f2', '#3bc9db'
 
 export function InsightsPage() {
   const [report, setReport] = useState<InsightsReport | null>(null);
+  const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState<number>(30);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    async function fetchMetrics() {
+      try {
+        const res = await fetch('/api/gui/metrics/global');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.ok && active) {
+          setGlobalMetrics(data.metrics);
+        }
+      } catch (err) {
+        // ignore polling errors
+      }
+    }
+    
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -108,7 +142,7 @@ export function InsightsPage() {
   return (
     <div className="insights-page-container">
       <div className="insights-header">
-        <h2>Analytics & Insights</h2>
+        <h2>Dashboard & Analytics</h2>
         <div className="insights-filters">
           <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
             <option value={7}>Last 7 Days</option>
@@ -117,6 +151,30 @@ export function InsightsPage() {
           </select>
         </div>
       </div>
+
+      {globalMetrics && (
+        <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '12px' }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem', color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔴 Live Command Center</h3>
+          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '120px' }}>
+               <div style={{ fontSize: '0.8rem', color: 'var(--color-text-dim)' }}>CPU Usage</div>
+               <div style={{ fontSize: '1.4rem', fontWeight: 600 }}>{globalMetrics.cpu_percent.toFixed(1)}%</div>
+            </div>
+            <div style={{ flex: 1, minWidth: '120px' }}>
+               <div style={{ fontSize: '0.8rem', color: 'var(--color-text-dim)' }}>Memory Usage</div>
+               <div style={{ fontSize: '1.4rem', fontWeight: 600 }}>{globalMetrics.memory_percent.toFixed(1)}%</div>
+            </div>
+            <div style={{ flex: 1, minWidth: '120px' }}>
+               <div style={{ fontSize: '0.8rem', color: 'var(--color-text-dim)' }}>Active Processes</div>
+               <div style={{ fontSize: '1.4rem', fontWeight: 600, color: globalMetrics.active_processes > 0 ? '#4ade80' : 'inherit' }}>{globalMetrics.active_processes}</div>
+            </div>
+            <div style={{ flex: 1, minWidth: '120px' }}>
+               <div style={{ fontSize: '0.8rem', color: 'var(--color-text-dim)' }}>Scheduled Cron Jobs</div>
+               <div style={{ fontSize: '1.4rem', fontWeight: 600 }}>{globalMetrics.cron_jobs}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="insights-grid">
         <div className="insight-card">

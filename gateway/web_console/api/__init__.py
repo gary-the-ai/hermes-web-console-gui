@@ -11,6 +11,7 @@ from .cron import register_cron_api_routes
 from .gateway_admin import register_gateway_admin_api_routes
 from .logs import register_logs_api_routes
 from .media import register_media_api_routes
+from .metrics import register_metrics_api_routes
 from .memory import register_memory_api_routes
 from .models_api import register_models_api_routes
 from .sessions import register_sessions_api_routes
@@ -34,6 +35,7 @@ def register_web_console_api_routes(app: web.Application) -> None:
     register_gateway_admin_api_routes(app)
     register_logs_api_routes(app)
     register_media_api_routes(app)
+    register_metrics_api_routes(app)
     register_memory_api_routes(app)
     register_models_api_routes(app)
     register_sessions_api_routes(app)
@@ -56,6 +58,7 @@ __all__ = [
     "register_gateway_admin_api_routes",
     "register_logs_api_routes",
     "register_media_api_routes",
+    "register_metrics_api_routes",
     "register_memory_api_routes",
     "register_models_api_routes",
     "register_sessions_api_routes",

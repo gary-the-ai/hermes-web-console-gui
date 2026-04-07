@@ -38,27 +38,32 @@ interface SessionSearchResponse {
 }
 
 export function SessionsPage() {
-  const [sessions, setSessions] = useState<Array<{ id: string; title: string; subtitle: string }>>([]);
+  const [sessions, setSessions] = useState<Array<{ id: string; title: string; subtitle: string; source: string }>>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [summary, setSummary] = useState<string>('Select a session to view details.');
   const [transcript, setTranscript] = useState<string[]>([]);
   const [title, setTitle] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Array<{ id: string; title: string; snippet: string }>>([]);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'cli' | 'web_console'>('all');
 
   const refreshSessions = async () => {
     try {
-      const response = await apiClient.get<SessionsResponse>('/sessions');
+      const sourceParam = sourceFilter === 'all' ? '' : `?source=${sourceFilter}`;
+      const response = await apiClient.get<SessionsResponse>(`/sessions${sourceParam}`);
       if (response.ok && response.sessions.length > 0) {
         const normalized = response.sessions.map((session) => ({
           id: session.session_id,
           title: session.title ?? session.session_id.slice(0, 12),
           subtitle: `Source: ${session.source ?? 'unknown'}`,
+          source: session.source ?? 'unknown',
         }));
         setSessions(normalized);
         if (!selectedId || !normalized.find((s) => s.id === selectedId)) {
           setSelectedId(normalized[0].id);
         }
+      } else {
+        setSessions([]);
       }
     } catch {
       // keep existing state
@@ -67,7 +72,7 @@ export function SessionsPage() {
 
   useEffect(() => {
     refreshSessions();
-  }, []);
+  }, [sourceFilter]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -139,6 +144,30 @@ export function SessionsPage() {
   return (
     <div className="sessions-layout">
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '260px' }}>
+        {/* Source filter tabs */}
+        <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '3px', border: '1px solid rgba(255,255,255,0.06)' }}>
+          {([['all', '📋 All'], ['cli', '💻 CLI'], ['web_console', '🌐 Web']] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setSourceFilter(value as 'all' | 'cli' | 'web_console')}
+              style={{
+                flex: 1,
+                padding: '6px 10px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                background: sourceFilter === value ? 'rgba(129, 140, 248, 0.2)' : 'transparent',
+                color: sourceFilter === value ? '#a5b4fc' : '#64748b',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {/* Session search bar */}
         <div style={{ display: 'flex', gap: '6px' }}>
           <input

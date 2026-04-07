@@ -49,6 +49,13 @@ export const ROUTES: readonly RouteDefinition[] = [
     description: 'View and edit long-term agent memory.',
     headline: 'Agent Memory',
     summary: 'What Hermes remembers about you and your workspace across sessions.'
+  },
+  {
+    id: 'missions',
+    label: 'Missions',
+    description: 'Kanban board for agent tasks.',
+    headline: 'Missions Board',
+    summary: 'Organize and track agent missions with drag-and-drop Kanban columns.'
   }
 ] as const;
 

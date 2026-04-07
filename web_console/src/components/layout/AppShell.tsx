@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ROUTES } from '../../app/router';
 import type { DrawerTab, InspectorTab, ModalTab, PrimaryRoute } from '../../lib/types';
+import { useConnection, HERMES_ONLY_ROUTES } from '../../lib/connectionContext';
 import { ChatPage } from '../../pages/ChatPage';
 import { SessionsPage } from '../../pages/SessionsPage';
 import { WorkspacePage } from '../../pages/WorkspacePage';
@@ -8,6 +9,7 @@ import { UsagePage } from '../../pages/UsagePage';
 import { JobsPage } from '../../pages/JobsPage';
 import { SkillsPage } from '../../pages/SkillsPage';
 import { MemoryPage } from '../../pages/MemoryPage';
+import { MissionsPage } from '../../pages/MissionsPage';
 import { initialUiState, setInspectorTab, setRoute, toggleDrawer, toggleInspector, toggleModal, toggleVoiceMode } from '../../store/uiStore';
 import { BottomDrawer } from './BottomDrawer';
 import { Inspector } from './Inspector';
@@ -30,15 +32,21 @@ function AllRoutes({ activeRoute, voiceMode }: { activeRoute: PrimaryRoute; voic
       <div style={hidden('jobs')}><JobsPage /></div>
       <div style={hidden('skills')}><SkillsPage /></div>
       <div style={hidden('memory')}><MemoryPage /></div>
+      <div style={hidden('missions')}><MissionsPage /></div>
     </>
   );
 }
 
 export function AppShell() {
   const [uiState, setUiState] = useState(initialUiState);
+  const connection = useConnection();
   const route = useMemo(() => ROUTES.find((item) => item.id === uiState.route) ?? ROUTES[0], [uiState.route]);
 
-  const navigate = (nextRoute: PrimaryRoute) => setUiState((current) => setRoute(current, nextRoute));
+  const navigate = (nextRoute: PrimaryRoute) => {
+    // Block navigation to Hermes-only routes when disconnected
+    if (!connection.online && HERMES_ONLY_ROUTES.has(nextRoute)) return;
+    setUiState((current) => setRoute(current, nextRoute));
+  };
   const selectInspectorTab = (tab: InspectorTab) => setUiState((current) => setInspectorTab(current, tab));
   const selectDrawerTab = (tab: DrawerTab) => setUiState((current) => toggleDrawer(current, tab));
   const selectModalTab = (tab: ModalTab) => setUiState((current) => toggleModal(current, tab));
@@ -50,7 +58,7 @@ export function AppShell() {
       const parts = hash.split('/');
       const nextRoute = parts[0] as PrimaryRoute;
       
-      if (['chat', 'sessions', 'workspace', 'usage', 'jobs', 'skills', 'memory'].includes(nextRoute)) {
+      if (['chat', 'sessions', 'workspace', 'usage', 'jobs', 'skills', 'memory', 'missions'].includes(nextRoute)) {
         if (uiState.route !== nextRoute) {
           setUiState(current => setRoute(current, nextRoute));
         }
@@ -120,6 +128,23 @@ export function AppShell() {
 
       <div className="layout-body">
         <main className="content" aria-label="Main content">
+          {!connection.online && (
+            <div style={{
+              padding: '10px 20px',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '10px',
+              margin: '8px 16px 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              fontSize: '0.85rem',
+              color: '#fca5a5',
+            }}>
+              <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+              <span>Hermes backend is <strong>offline</strong>. Some features (Skills, Memory, Background Jobs) are unavailable.</span>
+            </div>
+          )}
           <AllRoutes activeRoute={route.id} voiceMode={uiState.voiceMode} />
         </main>
 
