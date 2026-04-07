@@ -141,8 +141,11 @@ select {
   padding: 3px;
   overflow-x: auto;
   min-width: 0;
-  max-width: 50vw;
+  flex: 1;
+  max-width: 800px;
+  justify-content: flex-start;
 }
+
 
 .topbar-nav::-webkit-scrollbar {
   display: none;
