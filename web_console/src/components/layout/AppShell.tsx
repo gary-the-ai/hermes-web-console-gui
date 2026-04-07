@@ -148,7 +148,7 @@ export function AppShell() {
           <AllRoutes activeRoute={route.id} voiceMode={uiState.voiceMode} />
         </main>
 
-        <Inspector open={uiState.inspectorOpen} activeTab={uiState.inspectorTab} onTabChange={selectInspectorTab} />
+        <Inspector open={uiState.inspectorOpen} activeTab={uiState.inspectorTab} onTabChange={selectInspectorTab} onClose={() => setUiState((current) => toggleInspector(current))} />
       </div>
 
       <BottomDrawer open={uiState.drawerOpen} activeTab={uiState.drawerTab} onTabChange={selectDrawerTab} />

@@ -97,7 +97,7 @@ export function LogsPage() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Toolbar */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: '10px',
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px',
         padding: '8px 16px',
         background: 'rgba(0,0,0,0.3)',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
