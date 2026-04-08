@@ -79,39 +79,21 @@ Because this is a massive extension of the core agent, you'll need the Hermes co
 - Python (v3.11+)
 - Git
 
-### 1. Clone & Setup Backend
-First, pull down the repository and setup the core agent environment:
+### 1-Line Setup
+First, pull down the repository. Then use our convenient 1-line installer to automatically configure your Python environment via `uv` and install the React Web Console modules:
 
 ```bash
 git clone https://github.com/gary-the-ai/hermes-web-console-gui.git
 cd hermes-web-console-gui
 
-# Create virtual environment and install backend dependencies
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv venv --python 3.11
-source venv/bin/activate
-uv pip install -e ".[all]"
+./setup-gui.sh
 ```
 
-### 2. Start the API Server
-The Web Console is natively decoupled from the state logic, meaning you need to serve the Hermes API router:
-```bash
-hermes api start
-```
-*(By default, this runs on `http://127.0.0.1:8000`)*
-
-### 3. Build & Run the Web Console 
-
-In a new terminal window, compile the Vite application:
+### 1-Line Run
+After setup is complete, you can start the Gateway backend API and the React Frontend concurrently with a single command:
 
 ```bash
-cd hermes-web-console-gui/web_console
-
-# Install frontend dependencies
-npm install
-
-# Start the dev server with hot-reload
-npm run dev
+./run-gui.sh
 ```
 
 Navigate to `http://localhost:5173` in your browser. 
