@@ -41,6 +41,34 @@ class SettingsService:
         if not isinstance(patch, dict) or not patch:
             raise ValueError("Request body must include a non-empty JSON object.")
         current = self._config_loader()
+        
+        old_provider = current.get("provider")
+        new_provider = patch.get("provider")
+        if "model" in patch and isinstance(patch["model"], dict) and "provider" in patch["model"]:
+            new_provider = patch["model"]["provider"]
+            
+        if new_provider and new_provider != old_provider:
+            from hermes_cli.model_switch import detect_provider_for_model
+            old_model = current.get("model", {})
+            old_model_name = old_model if isinstance(old_model, str) else old_model.get("default", "")
+            
+            if old_model_name:
+                detected, _ = detect_provider_for_model(old_model_name, new_provider)
+                is_compatible = False
+                if new_provider == "openai-codex" and detected in ("openai", "openai-codex", "custom"):
+                    is_compatible = True
+                elif detected in (new_provider, "custom"):
+                    is_compatible = True
+                
+                if not is_compatible:
+                    if "model" not in patch:
+                        patch["model"] = {}
+                    if isinstance(patch["model"], dict):
+                        # Auto-populate a sensible default for Codex so the GUI isn't empty
+                        default_model = "gpt-5.4" if new_provider == "openai-codex" else ""
+                        patch["model"]["default"] = default_model
+                        patch["model"]["name"] = default_model
+
         updated = self._deep_merge(copy.deepcopy(current), patch)
         self._config_saver(updated)
         return self._sanitize_payload(updated)

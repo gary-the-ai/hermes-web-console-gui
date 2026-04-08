@@ -46,12 +46,14 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 import { ApiKeyConfigModal } from './ApiKeyConfigModal';
+import { CodexAuthModal } from './CodexAuthModal';
 
 export function ApiKeyManager() {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [configModalCategories, setConfigModalCategories] = useState<string[] | null>(null);
+  const [showCodexModal, setShowCodexModal] = useState(false);
 
   const fetchAuth = async () => {
     try {
@@ -196,15 +198,33 @@ export function ApiKeyManager() {
                         {isActive && ' · Active'}
                       </div>
                     </div>
-                    <span style={{
-                      fontSize: '0.7rem',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      background: loggedIn ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                      color: loggedIn ? '#4ade80' : '#f87171',
-                    }}>
-                      {loggedIn ? '✓' : '✗'}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: loggedIn ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                        color: loggedIn ? '#4ade80' : '#f87171',
+                      }}>
+                        {loggedIn ? '✓' : '✗'}
+                      </span>
+                      {p.provider === 'openai-codex' && (
+                        <button
+                          onClick={() => setShowCodexModal(true)}
+                          style={{
+                            background: 'rgba(56, 189, 248, 0.1)',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            color: '#38bdf8',
+                            borderRadius: '4px',
+                            padding: '2px 8px',
+                            fontSize: '0.7rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Manage
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -247,6 +267,10 @@ export function ApiKeyManager() {
             fetchAuth();
           }}
         />
+      )}
+
+      {showCodexModal && (
+        <CodexAuthModal onClose={() => { setShowCodexModal(false); fetchAuth(); }} />
       )}
     </section>
   );

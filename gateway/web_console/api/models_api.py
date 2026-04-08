@@ -144,6 +144,15 @@ async def handle_post_models_switch(request: web.Request) -> web.Response:
             "error": result.error_message,
         }, status=400)
 
+    # Validate provider compatibility (specifically for Codex)
+    if cfg.get("provider") == "openai-codex":
+        # If the requested model resolves to a provider other than openai, codex, or custom
+        if result.target_provider not in ("openai", "openai-codex", "custom"):
+            return web.json_response({
+                "ok": False,
+                "error": f"The '{result.new_model}' model is not supported when using Codex with a ChatGPT account. Please select an OpenAI model or change your active provider to {result.target_provider}."
+            }, status=400)
+
     # Persist to config.yaml if global
     if persist_global:
         try:
@@ -153,11 +162,22 @@ async def handle_post_models_switch(request: web.Request) -> web.Response:
                     file_cfg = yaml.safe_load(f) or {}
             else:
                 file_cfg = {}
-            model_cfg = file_cfg.setdefault("model", {})
-            model_cfg["name"] = result.new_model
+            
+            # Ensure model is a dict before setting properties
+            model_cfg = file_cfg.get("model", {})
+            if isinstance(model_cfg, str):
+                model_cfg = {"default": model_cfg}
+            elif not isinstance(model_cfg, dict):
+                model_cfg = {}
+            
+            model_cfg["default"] = result.new_model
             model_cfg["provider"] = result.target_provider
+            model_cfg["name"] = result.new_model  # Keep name for backward compatibility in UI
             if result.base_url:
                 model_cfg["base_url"] = result.base_url
+            
+            file_cfg["model"] = model_cfg
+            
             from hermes_cli.config import save_config
             save_config(file_cfg)
         except Exception as exc:

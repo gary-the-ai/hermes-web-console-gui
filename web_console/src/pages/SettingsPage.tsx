@@ -21,8 +21,8 @@ function buildCategories(s: Record<string, any>): SettingCategory[] {
       id: 'general',
       label: 'General',
       fields: [
-        { id: 'model.default', label: 'Default Model', type: 'text', value: String(s.model?.default ?? s.model ?? '') },
-        { id: 'model.provider', label: 'Inference Provider', type: 'text', value: String(s.model?.provider ?? s.provider ?? 'auto') },
+        { id: 'model.default', label: 'Default Model', type: 'text', value: String(s.model?.default || s.model?.name || (typeof s.model === 'string' ? s.model : '')) },
+        { id: 'model.provider', label: 'Inference Provider', type: 'text', value: String(s.model?.provider || s.provider || 'auto') },
         { id: 'model.base_url', label: 'Custom Base URL', type: 'text', value: String(s.model?.base_url ?? '') },
         { id: 'timezone', label: 'Timezone (IANA)', type: 'text', value: String(s.timezone ?? ''), placeholder: 'e.g. America/New_York (empty = server local)' },
       ]

@@ -2539,6 +2539,86 @@ def _login_openai_codex(args, pconfig: ProviderConfig) -> None:
     print(f"  Config updated: {config_path} (model.provider=openai-codex)")
 
 
+def _codex_device_code_request() -> Dict[str, Any]:
+    """Request a device code for Codex oauth and return the raw response dict."""
+    issuer = "https://auth.openai.com"
+    client_id = CODEX_OAUTH_CLIENT_ID
+
+    try:
+        with httpx.Client(timeout=httpx.Timeout(15.0)) as client:
+            resp = client.post(
+                f"{issuer}/api/accounts/deviceauth/usercode",
+                json={"client_id": client_id},
+                headers={"Content-Type": "application/json"},
+            )
+    except Exception as exc:
+        raise AuthError(
+            f"Failed to request device code: {exc}",
+            provider="openai-codex", code="device_code_request_failed",
+        )
+
+    if resp.status_code != 200:
+        raise AuthError(
+            f"Device code request returned status {resp.status_code}.",
+            provider="openai-codex", code="device_code_request_error",
+        )
+    return resp.json()
+
+
+def _codex_device_code_poll(device_auth_id: str, user_code: str) -> Optional[Dict[str, Any]]:
+    """Poll the token endpoint. Returns None if pending, or dict with tokens if complete."""
+    issuer = "https://auth.openai.com"
+    client_id = CODEX_OAUTH_CLIENT_ID
+
+    try:
+        with httpx.Client(timeout=httpx.Timeout(15.0)) as client:
+            poll_resp = client.post(
+                f"{issuer}/api/accounts/deviceauth/token",
+                json={"device_auth_id": device_auth_id, "user_code": user_code},
+                headers={"Content-Type": "application/json"},
+            )
+
+            if poll_resp.status_code == 200:
+                code_resp = poll_resp.json()
+            elif poll_resp.status_code in (403, 404):
+                return None  # Pending
+            else:
+                raise AuthError(
+                    f"Device auth polling returned status {poll_resp.status_code}.",
+                    provider="openai-codex", code="device_code_poll_error",
+                )
+    except Exception as exc:
+        if isinstance(exc, AuthError):
+            raise
+        raise AuthError(f"Poll failed: {exc}", provider="openai-codex", code="device_code_poll_error")
+
+    authorization_code = code_resp.get("authorization_code", "")
+    code_verifier = code_resp.get("code_verifier", "")
+    if not authorization_code or not code_verifier:
+        raise AuthError("Missing auth code/verifier.", provider="openai-codex", code="device_code_incomplete_exchange")
+
+    try:
+        with httpx.Client(timeout=httpx.Timeout(15.0)) as client:
+            token_resp = client.post(
+                CODEX_OAUTH_TOKEN_URL,
+                data={
+                    "grant_type": "authorization_code",
+                    "code": authorization_code,
+                    "redirect_uri": f"{issuer}/deviceauth/callback",
+                    "client_id": client_id,
+                    "code_verifier": code_verifier,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+    except Exception as exc:
+        raise AuthError(f"Token exchange failed: {exc}", provider="openai-codex", code="token_exchange_failed")
+
+    if token_resp.status_code != 200:
+        raise AuthError(f"Token exchange returned status {token_resp.status_code} - {token_resp.text}.", provider="openai-codex", code="token_exchange_error")
+
+    return token_resp.json()
+
+
 def _codex_device_code_login() -> Dict[str, Any]:
     """Run the OpenAI device code login flow and return credentials dict."""
     import time as _time

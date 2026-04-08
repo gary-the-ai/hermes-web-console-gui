@@ -791,17 +791,32 @@ def list_authenticated_providers(
         if overlay.auth_type in ("oauth_device_code", "oauth_external", "external_process"):
             # These use auth stores, not env vars — check for auth.json entries
             try:
-                from hermes_cli.auth import _read_auth_store
-                store = _read_auth_store()
-                if store and pid in store:
+                from hermes_cli.auth import get_provider_auth_state
+                if get_provider_auth_state(pid):
                     has_creds = True
             except Exception:
                 pass
+            # Also check credential pool (multi-account store)
+            if not has_creds:
+                try:
+                    from hermes_cli.auth import read_credential_pool
+                    pool_entries = read_credential_pool(pid)
+                    if pool_entries:
+                        has_creds = True
+                except Exception:
+                    pass
         if not has_creds:
             continue
 
-        # Use curated list
-        model_ids = curated.get(pid, [])
+        # For Codex, use live model list (includes gpt-5.4 etc.)
+        if pid == "openai-codex":
+            try:
+                from hermes_cli.codex_models import get_codex_model_ids
+                model_ids = get_codex_model_ids()
+            except Exception:
+                model_ids = curated.get(pid, [])
+        else:
+            model_ids = curated.get(pid, [])
         total = len(model_ids)
         top = model_ids[:max_models]
 
