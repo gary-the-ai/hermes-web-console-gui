@@ -69,6 +69,7 @@ Here is a glimpse of the gorgeous new interfaces powering your agent:
   - **Advanced Credentials Pool**: Rotate API keys and assign them to JSON matrices securely preventing invalid configuration schemas on startup.
 - **Persistent Web Theme Engine**: Customize dark, light, or aesthetic visual skins syncing natively via your local Hermes backend.
 - **Automations & Cron Jobs**: Configure, pause, edit, and track scheduled cron jobs visually without terminal flags.
+- **Advanced CLI Parity**: Support for real-time Streaming Reasoning blocks, dynamic Context Window Usage Monitoring, and interactive Session Branching (Conversation Forking).
 
 ## 🚀 Installation & Setup
 
@@ -140,6 +141,11 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 ---
 
 ## 📜 Changelog
+
+### [2026.4.11] - CLI Parity: Reasoning, Monitoring, & Branching
+- **Streaming Reasoning Block**: Added live, collapsible reasoning UI elements handling `message.reasoning.delta` SSE events identically to CLI thinking visuals.
+- **Context Window Meter**: Active progress gauge injected to the TopBar analyzing prompt sizes vs model bounds dynamically. 
+- **Session Branching**: Built logic to gracefully fork session memory locally bypassing standard routing to safely fork earlier conversation indices seamlessly.
 
 ### [2026.4.8] - Layout & Responsive Redesign
 - **Workspace Layout Redesign**: Converted the previously static left (Workspace) and right (Inspector) sidebars to fully collapsible native column layouts protecting viewport dimensions.

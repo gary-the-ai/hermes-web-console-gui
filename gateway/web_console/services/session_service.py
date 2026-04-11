@@ -156,6 +156,7 @@ class SessionService:
         The new session's ``parent_session_id`` is set to the source session.
         """
         import time
+        import uuid
 
         resolved = self.db.resolve_session_id(session_id) or session_id
         source = self.db.get_session(resolved)
@@ -168,13 +169,12 @@ class SessionService:
 
         # Generate a new session id
         ts = time.strftime("%Y%m%d_%H%M%S")
-        import uuid
-
         branch_id = f"{ts}_branch_{uuid.uuid4().hex[:6]}"
 
         # Create the branched session
         self.db.create_session(
             session_id=branch_id,
+            source=source.get("source", "web_console"),
             model=source.get("model", ""),
             system_prompt=source.get("system_prompt", ""),
             parent_session_id=resolved,
@@ -183,11 +183,19 @@ class SessionService:
         # Set a descriptive title
         source_title = source.get("title") or resolved
         branch_title = f"Branch of {source_title}"
-        self.db.set_session_title(branch_id, branch_title)
+        try:
+            self.db.set_session_title(branch_id, branch_title)
+        except ValueError:
+            # Title conflict — append a suffix
+            branch_title = f"Branch of {source_title} ({branch_id[:8]})"
+            try:
+                self.db.set_session_title(branch_id, branch_title)
+            except ValueError:
+                pass  # Give up on title, keep the default
 
         # Copy messages into the new session
         for msg in messages:
-            self.db.add_message(
+            self.db.append_message(
                 session_id=branch_id,
                 role=msg.get("role", "user"),
                 content=msg.get("content", ""),
