@@ -90,6 +90,12 @@ cd hermes-web-console-gui
 ```
 
 ### 1-Line Run
+Works on Linux, macOS, WSL2, and Android via Termux. The installer handles the platform-specific setup for you.
+
+> **Android / Termux:** The tested manual path is documented in the [Termux guide](https://hermes-agent.nousresearch.com/docs/getting-started/termux). On Termux, Hermes installs a curated `.[termux]` extra because the full `.[all]` extra currently pulls Android-incompatible voice dependencies.
+>
+> **Windows:** Native Windows is not supported. Please install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and run the command above.
+
 After setup is complete, you can start the Gateway backend API and the React Frontend concurrently with a single command:
 
 ```bash
