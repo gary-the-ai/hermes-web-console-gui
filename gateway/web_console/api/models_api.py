@@ -145,12 +145,20 @@ async def handle_post_models_switch(request: web.Request) -> web.Response:
         }, status=400)
 
     # Validate provider compatibility (specifically for Codex)
+    codex_compatible = ("openai", "openai-codex", "custom")
+    # Guard 1: Currently on Codex — new model must be OpenAI-compatible
     if cfg.get("provider") == "openai-codex":
-        # If the requested model resolves to a provider other than openai, codex, or custom
-        if result.target_provider not in ("openai", "openai-codex", "custom"):
+        if result.target_provider not in codex_compatible:
             return web.json_response({
                 "ok": False,
                 "error": f"The '{result.new_model}' model is not supported when using Codex with a ChatGPT account. Please select an OpenAI model or change your active provider to {result.target_provider}."
+            }, status=400)
+    # Guard 2: Switching TO Codex — resolved model must be OpenAI-compatible
+    if result.target_provider == "openai-codex":
+        if cfg.get("provider") not in codex_compatible and result.target_provider not in codex_compatible:
+            return web.json_response({
+                "ok": False,
+                "error": f"Cannot switch to Codex with model '{result.new_model}' (resolved provider: {result.target_provider}). Only OpenAI models are compatible with Codex."
             }, status=400)
 
     # Persist to config.yaml if global

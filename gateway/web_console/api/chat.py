@@ -545,11 +545,11 @@ async def handle_chat_compress(request: web.Request) -> web.Response:
     """Manually trigger context compression for a session."""
     data = await _read_json_body(request)
     if data is None:
-        return _json_error(400, "invalid_json", "Request body must be a valid JSON object.")
+        return _json_error(status=400, code="invalid_json", message="Request body must be a valid JSON object.")
 
     session_id = data.get("session_id")
     if not isinstance(session_id, str) or not session_id:
-        return _json_error(400, "invalid_session_id", "The 'session_id' field must be a non-empty string.")
+        return _json_error(status=400, code="invalid_session_id", message="The 'session_id' field must be a non-empty string.")
 
     from run_agent import AIAgent
     

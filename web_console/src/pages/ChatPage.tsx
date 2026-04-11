@@ -281,10 +281,10 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
     setUsageData({});
     try {
       const res = await apiClient.get<any>(`/sessions/${sid}/transcript`);
-      if (res.ok && Array.isArray(res.transcript)) {
+      if (res.ok && Array.isArray(res.items)) {
         const mappedItems: TranscriptItem[] = [];
         let curUsage: Record<string, any> | undefined;
-        for (const item of res.transcript) {
+        for (const item of res.items) {
           if (item.type === 'human') {
             mappedItems.push({ role: 'user', title: 'You', content: item.content || '' });
           } else if (item.type === 'assistant') {
@@ -316,14 +316,21 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
   useEffect(() => {
     let active = true;
 
+    // Check URL hash for deep linking FIRST (e.g. #/chat/session-xyz)
+    const hashParts = window.location.hash.replace('#/', '').split('/');
+    const hasDeepLink = hashParts[0] === 'chat' && !!hashParts[1];
+
     // Check backend connectivity
     apiClient
       .get<{ status: string }>('/health')
       .then(() => {
         if (active) {
           setBackendConnected(true);
-          setRunStatus('ready');
-          setItems([{ role: 'system', title: 'System', content: '✓ Connected to Hermes backend. Send a message to start chatting.' }]);
+          // Only show generic connected message if NOT loading a deep-linked session
+          if (!hasDeepLink) {
+            setRunStatus('ready');
+            setItems([{ role: 'system', title: 'System', content: '✓ Connected to Hermes backend. Send a message to start chatting.' }]);
+          }
         }
       })
       .catch(() => {
@@ -341,9 +348,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
       if (active) refreshPending(active);
     }, 3000);
 
-    // Check URL hash for deep linking (e.g. #/chat/session-xyz)
-    const hashParts = window.location.hash.replace('#/', '').split('/');
-    if (hashParts[0] === 'chat' && hashParts[1]) {
+    if (hasDeepLink) {
       loadSession(hashParts[1]);
     }
 
@@ -527,9 +532,13 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
               onClick={async () => {
                 if (!currentRunId) return;
                 try {
-                  await apiClient.post('/chat/stop', { run_id: currentRunId });
-                  setRunStatus('stopped');
-                  setItems((prev) => [...prev, { role: 'system', title: 'System', content: '⏹ Stop requested.' }]);
+                  const res = await apiClient.post<any>('/chat/stop', { run_id: currentRunId });
+                  if (res.supported && res.stop_requested) {
+                    setRunStatus('stopped');
+                    setItems((prev) => [...prev, { role: 'system', title: 'System', content: '⏹ Stop requested.' }]);
+                  } else {
+                    setItems((prev) => [...prev, { role: 'system', title: 'System', content: 'ℹ️ Stop is not supported for this run. It will complete naturally.' }]);
+                  }
                 } catch { /* ignore */ }
               }}
               style={{ padding: '6px 16px', borderRadius: '20px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', cursor: 'pointer', fontSize: '0.85rem' }}
@@ -558,8 +567,12 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
               type="button"
               onClick={async () => {
                 try {
-                  await apiClient.post('/chat/undo', { session_id: sessionId, run_id: currentRunId });
-                  setItems((prev) => prev.slice(0, -1));
+                  const res = await apiClient.post<any>('/chat/undo', { session_id: sessionId, run_id: currentRunId });
+                  if (res.supported) {
+                    setItems((prev) => prev.slice(0, -1));
+                  } else {
+                    setItems((prev) => [...prev, { role: 'system', title: 'System', content: 'ℹ️ Undo is not yet supported. Use session branching to fork from an earlier point.' }]);
+                  }
                 } catch { /* ignore */ }
               }}
               style={{ padding: '6px 16px', borderRadius: '20px', background: 'rgba(251, 191, 36, 0.15)', border: '1px solid rgba(251, 191, 36, 0.3)', color: '#fde68a', cursor: 'pointer', fontSize: '0.85rem' }}

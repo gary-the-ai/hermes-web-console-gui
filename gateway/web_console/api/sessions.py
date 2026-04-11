@@ -226,11 +226,38 @@ async def handle_branch_session(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, **result})
 
 
+async def handle_session_search(request: web.Request) -> web.Response:
+    """GET /api/gui/session-search?q=... — FTS5 full-text search across sessions."""
+    query = request.query.get("q", "").strip()
+    if not query:
+        return web.json_response({"ok": True, "search": {"results": []}})
+
+    service = _get_session_service(request)
+    try:
+        results = service.db.search_messages(query, limit=20)
+        formatted = []
+        for r in results:
+            formatted.append({
+                "session_id": r.get("session_id", ""),
+                "session_title": r.get("session_title") or r.get("session_id", "")[:12],
+                "snippet": r.get("snippet") or r.get("content", "")[:120],
+                "role": r.get("role", ""),
+            })
+        return web.json_response({"ok": True, "search": {"results": formatted}})
+    except Exception as exc:
+        return _json_error(
+            status=500,
+            code="search_error",
+            message=f"Search failed: {exc}",
+        )
+
+
 def register_sessions_api_routes(app: web.Application) -> None:
     if app.get(SESSIONS_SERVICE_APP_KEY) is None:
         app[SESSIONS_SERVICE_APP_KEY] = SessionService()
 
     app.router.add_get("/api/gui/sessions", handle_list_sessions)
+    app.router.add_get("/api/gui/session-search", handle_session_search)
     app.router.add_get("/api/gui/sessions/{session_id}", handle_get_session)
     app.router.add_get("/api/gui/sessions/{session_id}/transcript", handle_get_transcript)
     app.router.add_get("/api/gui/sessions/{session_id}/export", handle_export_session)
