@@ -53,7 +53,7 @@ export function JobsPage() {
   }
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
+    <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto', flex: 1, overflowY: 'auto', minHeight: 0, width: '100%' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 600, margin: '0 0 8px 0', color: '#f8fafc' }}>Background Jobs</h1>

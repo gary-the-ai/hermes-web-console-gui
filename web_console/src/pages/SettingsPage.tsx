@@ -197,7 +197,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '800px', margin: '0 auto', flex: 1, overflowY: 'auto', minHeight: 0, paddingBottom: '30px', width: '100%' }}>
       <ThemeSettings />
       <ModelPicker />
       <ProviderManager />

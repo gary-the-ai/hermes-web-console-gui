@@ -143,7 +143,7 @@ export function SessionsPage() {
 
   return (
     <div className="sessions-layout">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '260px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '260px', overflowY: 'auto', minHeight: 0, paddingRight: '8px', paddingBottom: '20px' }}>
         {/* Source filter tabs */}
         <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '3px', border: '1px solid rgba(255,255,255,0.06)' }}>
           {([['all', '📋 All'], ['cli', '💻 CLI'], ['web_console', '🌐 Web']] as const).map(([value, label]) => (

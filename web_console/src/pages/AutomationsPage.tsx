@@ -101,7 +101,7 @@ export function AutomationsPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto', minHeight: 0, paddingBottom: '30px', paddingRight: '12px' }}>
       <CronList
         jobs={jobs}
         onCreate={handleCreate}

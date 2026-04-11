@@ -100,7 +100,7 @@ export function SkillsPage() {
   const [activeTab, setActiveTab] = useState<'storefront' | 'installed' | 'config'>('storefront');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '8px', paddingBottom: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ margin: '0 0 8px 0', fontSize: '1.5rem', color: '#f8fafc' }}>Skills & Capabilities</h1>
