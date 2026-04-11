@@ -4551,6 +4551,7 @@ class AIAgent:
 
     def _fire_reasoning_delta(self, text: str) -> None:
         """Fire reasoning callback if registered."""
+        self._emit_gui_event("message.reasoning.delta", content=text)
         cb = self.reasoning_callback
         if cb is not None:
             try:

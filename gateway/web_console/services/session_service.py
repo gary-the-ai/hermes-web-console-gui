@@ -148,6 +148,61 @@ class SessionService:
             "session": detail,
         }
 
+    def branch_session(self, session_id: str, at_message_index: int | None = None) -> dict[str, Any] | None:
+        """Create a new session branched from an existing one.
+
+        Copies messages up to ``at_message_index`` (inclusive) into a fresh
+        session.  If *at_message_index* is None the entire history is copied.
+        The new session's ``parent_session_id`` is set to the source session.
+        """
+        import time
+
+        resolved = self.db.resolve_session_id(session_id) or session_id
+        source = self.db.get_session(resolved)
+        if not source:
+            return None
+
+        messages = self.db.get_messages(resolved)
+        if at_message_index is not None:
+            messages = messages[: at_message_index + 1]
+
+        # Generate a new session id
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        import uuid
+
+        branch_id = f"{ts}_branch_{uuid.uuid4().hex[:6]}"
+
+        # Create the branched session
+        self.db.create_session(
+            session_id=branch_id,
+            model=source.get("model", ""),
+            system_prompt=source.get("system_prompt", ""),
+            parent_session_id=resolved,
+        )
+
+        # Set a descriptive title
+        source_title = source.get("title") or resolved
+        branch_title = f"Branch of {source_title}"
+        self.db.set_session_title(branch_id, branch_title)
+
+        # Copy messages into the new session
+        for msg in messages:
+            self.db.add_message(
+                session_id=branch_id,
+                role=msg.get("role", "user"),
+                content=msg.get("content", ""),
+                tool_calls=msg.get("tool_calls"),
+                tool_call_id=msg.get("tool_call_id"),
+                tool_name=msg.get("tool_name"),
+            )
+
+        return {
+            "session_id": branch_id,
+            "parent_session_id": resolved,
+            "title": branch_title,
+            "message_count": len(messages),
+        }
+
     def delete_session(self, session_id: str) -> bool:
         resolved = self.db.resolve_session_id(session_id) or session_id
         return self.db.delete_session(resolved)

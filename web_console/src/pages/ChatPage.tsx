@@ -113,7 +113,34 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
         setItems((prev) => [...prev, mapped]);
       }
 
-      if (event.type === 'message.assistant.delta') {
+      if (event.type === 'message.reasoning.delta') {
+        const text = String(event.payload.content || '');
+        if (text) {
+          setItems((prev) => {
+            const next = [...prev];
+            // Find or create the current assistant message to attach reasoning
+            let lastAssistantIdx = -1;
+            for (let i = next.length - 1; i >= 0; i--) {
+              if (next[i].role === 'assistant') {
+                lastAssistantIdx = i;
+                break;
+              }
+              if (next[i].role === 'user') break;
+            }
+            if (lastAssistantIdx >= 0) {
+              next[lastAssistantIdx] = {
+                ...next[lastAssistantIdx],
+                reasoning: (next[lastAssistantIdx].reasoning || '') + text,
+                isReasoningStreaming: true,
+              };
+            } else {
+              // Reasoning arrived before content — create placeholder
+              next.push({ role: 'assistant', title: 'Hermes', content: '', reasoning: text, isReasoningStreaming: true });
+            }
+            return next;
+          });
+        }
+      } else if (event.type === 'message.assistant.delta') {
         const text = String(event.payload.content || '');
         if (text) {
           setItems((prev) => {
@@ -127,9 +154,12 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
                 lastAssistantIdx = i;
                 break;
               }
+              if (next[i].role === 'user') {
+                break;
+              }
             }
             if (lastAssistantIdx >= 0) {
-              next[lastAssistantIdx] = { ...next[lastAssistantIdx], content: next[lastAssistantIdx].content + text, isStreaming: true };
+              next[lastAssistantIdx] = { ...next[lastAssistantIdx], content: next[lastAssistantIdx].content + text, isStreaming: true, isReasoningStreaming: false };
             } else {
               next.push({ role: 'assistant', title: 'Hermes', content: text, isStreaming: true });
             }
@@ -138,6 +168,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
         }
       } else if (event.type === 'message.assistant.completed') {
         const text = String(event.payload.content || '');
+        const reasoning = event.payload.reasoning ? String(event.payload.reasoning) : undefined;
         setItems((prev) => {
           const next = [...prev];
           const thinkingIdx = next.findIndex(i => i.content === '⏳ Hermes is thinking…');
@@ -149,11 +180,21 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
               lastAssistantIdx = i;
               break;
             }
+            if (next[i].role === 'user') {
+              break;
+            }
           }
           if (lastAssistantIdx >= 0) {
-            next[lastAssistantIdx] = { ...next[lastAssistantIdx], content: text, isStreaming: false };
+            next[lastAssistantIdx] = {
+              ...next[lastAssistantIdx],
+              content: text,
+              isStreaming: false,
+              isReasoningStreaming: false,
+              // Prefer streamed reasoning, fall back to completed-payload reasoning
+              reasoning: next[lastAssistantIdx].reasoning || reasoning,
+            };
           } else {
-            next.push({ role: 'assistant', title: 'Hermes', content: text || '(no response text)', isStreaming: false });
+            next.push({ role: 'assistant', title: 'Hermes', content: text || '(no response text)', isStreaming: false, reasoning });
           }
           return next;
         });
@@ -189,6 +230,10 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
             next.total_tokens = (next.total_tokens || 0) + (usage?.total_tokens || 0);
             return next;
           });
+          // Dispatch usage sync event for TopBar context meter
+          window.dispatchEvent(new CustomEvent('hermes-usage-sync', {
+            detail: { usage: event.payload.usage }
+          }));
         }
         // Remove the "thinking" indicator
         setItems((prev) => {
@@ -341,6 +386,20 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
     refreshPending(true);
   };
 
+  const handleBranch = async (messageIndex: number) => {
+    if (sessionId === 'current') return;
+    try {
+      const res = await apiClient.post<{ ok: boolean; session_id: string; title: string; message_count: number }>(`/sessions/${sessionId}/branch`, { at_message_index: messageIndex });
+      if (res.ok && res.session_id) {
+        setItems((prev) => [...prev, { role: 'system', title: 'System', content: `🌿 Branched session created: ${res.title} (${res.message_count} messages). Loading…` }]);
+        setTimeout(() => loadSession(res.session_id), 500);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setItems((prev) => [...prev, { role: 'system', title: 'Error', content: `Failed to branch: ${msg}` }]);
+    }
+  };
+
   const handleSend = async (prompt: string, attachments: AttachedFile[] = [], isBackground?: boolean, isQuickAsk?: boolean) => {
     setItems((prev) => [...prev, { role: 'user', title: isQuickAsk ? 'You (Quick Ask)' : 'You', content: prompt + (attachments.length ? ` [${attachments.length} file(s) attached]` : '') }]);
     setRunStatus('sending…');
@@ -453,7 +512,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
            ☰
         </button>
         <div className="chat-main-column" style={{ paddingLeft: '48px' }}>
-          <Transcript items={items} />
+          <Transcript items={items} sessionId={sessionId} onBranch={handleBranch} />
           <div ref={scrollRef} />
 
         {/* Action Prompts (only visible when pending) */}

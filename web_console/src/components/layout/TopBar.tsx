@@ -78,6 +78,7 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
   const [activeModel, setActiveModel] = useState<ActiveModelResponse | null>(null);
   const [quickSwitchOpen, setQuickSwitchOpen] = useState(false);
   const [quickSwitching, setQuickSwitching] = useState<string | null>(null);
+  const [usageTokens, setUsageTokens] = useState<{ prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchActiveModel = useCallback(async () => {
@@ -118,6 +119,18 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [quickSwitchOpen]);
+
+  // Listen for usage sync events from ChatPage
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.usage) {
+        setUsageTokens(detail.usage);
+      }
+    };
+    window.addEventListener('hermes-usage-sync', handler);
+    return () => window.removeEventListener('hermes-usage-sync', handler);
+  }, []);
 
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true);
@@ -297,6 +310,56 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
             )}
           </div>
         )}
+
+        {/* Context Window Usage Meter */}
+        {activeModel?.context_window && usageTokens.prompt_tokens != null && usageTokens.prompt_tokens > 0 && (() => {
+          const used = usageTokens.prompt_tokens || 0;
+          const max = activeModel.context_window;
+          const ratio = Math.min(used / max, 1);
+          const pct = (ratio * 100).toFixed(1);
+          const color = ratio < 0.5 ? '#22c55e' : ratio < 0.8 ? '#eab308' : '#ef4444';
+          const usedK = used >= 1000 ? `${(used / 1000).toFixed(1)}k` : String(used);
+          const maxK = max >= 1000 ? `${(max / 1000).toFixed(0)}k` : String(max);
+
+          return (
+            <div
+              title={`Context usage: ${usedK} / ${maxK} tokens (${pct}%)`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '3px 10px',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '14px',
+                fontSize: '0.68rem',
+                fontFamily: "'JetBrains Mono', monospace",
+                color: '#94a3b8',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span style={{ fontSize: '0.75rem' }}>📊</span>
+              <div style={{
+                width: '60px',
+                height: '6px',
+                borderRadius: '3px',
+                background: 'rgba(255,255,255,0.08)',
+                overflow: 'hidden',
+                position: 'relative',
+              }}>
+                <div style={{
+                  width: `${ratio * 100}%`,
+                  height: '100%',
+                  borderRadius: '3px',
+                  background: color,
+                  transition: 'width 0.5s ease, background 0.3s ease',
+                }} />
+              </div>
+              <span style={{ color, fontWeight: 600 }}>{pct}%</span>
+              <span style={{ color: '#64748b' }}>{usedK}/{maxK}</span>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Center: Navigation tabs */}

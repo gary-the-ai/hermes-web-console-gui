@@ -29,6 +29,13 @@ class ChatService:
         self.state = state or get_web_console_state()
         self.runtime_runner = runtime_runner or self._default_runtime_runner
         self.human_service = human_service
+        self._session_db = None
+        try:
+            from hermes_state import SessionDB
+            self._session_db = SessionDB()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("SessionDB unavailable: %s", e)
 
     async def run_chat(
         self,
@@ -105,8 +112,12 @@ class ChatService:
 
             print("DEBUG: Extracting assistant text...", flush=True)
             assistant_text = self._extract_assistant_text(result_dict)
+            reasoning_text = self._extract_reasoning_text(result_dict)
             print("DEBUG: Publishing message.assistant.completed...", flush=True)
-            await publish("message.assistant.completed", {"content": assistant_text})
+            completed_payload: dict[str, Any] = {"content": assistant_text}
+            if reasoning_text:
+                completed_payload["reasoning"] = reasoning_text
+            await publish("message.assistant.completed", completed_payload)
             print("DEBUG: Publishing run.completed...", flush=True)
             await publish(
                 "run.completed",
@@ -169,6 +180,7 @@ class ChatService:
                     gui_event_callback=gui_event_callback,
                     skip_memory=True if is_quick_ask else runtime_kwargs.get("skip_memory", False),
                     disabled_toolsets=["core"] if is_quick_ask else None,
+                    session_db=self._session_db,
                 )
                 return agent.run_conversation(
                     user_message=prompt,
@@ -205,4 +217,15 @@ class ChatService:
                 content = message.get("content")
                 if isinstance(content, str):
                     return content
+        return ""
+
+    @staticmethod
+    def _extract_reasoning_text(result: dict[str, Any]) -> str:
+        """Extract reasoning/thinking text from the last assistant message."""
+        messages = result.get("messages") or []
+        for message in reversed(messages):
+            if message.get("role") == "assistant":
+                reasoning = message.get("reasoning") or message.get("thinking")
+                if isinstance(reasoning, str) and reasoning.strip():
+                    return reasoning
         return ""

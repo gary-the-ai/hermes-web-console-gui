@@ -198,6 +198,34 @@ async def handle_export_session(request: web.Request) -> web.Response:
     return response
 
 
+async def handle_branch_session(request: web.Request) -> web.Response:
+    """POST /api/gui/sessions/{session_id}/branch — fork a session at a message index."""
+    service = _get_session_service(request)
+    session_id = request.match_info["session_id"]
+
+    data = await _read_json_body(request)
+    at_message_index: int | None = None
+    if data and "at_message_index" in data:
+        try:
+            at_message_index = int(data["at_message_index"])
+        except (TypeError, ValueError):
+            return _json_error(
+                status=400,
+                code="invalid_index",
+                message="The 'at_message_index' field must be an integer.",
+            )
+
+    result = service.branch_session(session_id, at_message_index=at_message_index)
+    if result is None:
+        return _json_error(
+            status=404,
+            code="session_not_found",
+            message="No session was found for the provided session_id.",
+            session_id=session_id,
+        )
+    return web.json_response({"ok": True, **result})
+
+
 def register_sessions_api_routes(app: web.Application) -> None:
     if app.get(SESSIONS_SERVICE_APP_KEY) is None:
         app[SESSIONS_SERVICE_APP_KEY] = SessionService()
@@ -208,4 +236,6 @@ def register_sessions_api_routes(app: web.Application) -> None:
     app.router.add_get("/api/gui/sessions/{session_id}/export", handle_export_session)
     app.router.add_post("/api/gui/sessions/{session_id}/title", handle_set_title)
     app.router.add_post("/api/gui/sessions/{session_id}/resume", handle_resume_session)
+    app.router.add_post("/api/gui/sessions/{session_id}/branch", handle_branch_session)
     app.router.add_delete("/api/gui/sessions/{session_id}", handle_delete_session)
+

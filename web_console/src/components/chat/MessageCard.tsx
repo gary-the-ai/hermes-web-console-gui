@@ -10,6 +10,10 @@ interface MessageCardProps {
   title: string;
   content: string;
   isStreaming?: boolean;
+  reasoning?: string;
+  isReasoningStreaming?: boolean;
+  messageIndex?: number;
+  onBranch?: (messageIndex: number) => void;
 }
 
 interface TtsResponse {
@@ -17,8 +21,10 @@ interface TtsResponse {
   tts?: { success?: boolean; audio_file?: string; error?: string };
 }
 
-export function MessageCard({ role, title, content, isStreaming }: MessageCardProps) {
+export function MessageCard({ role, title, content, isStreaming, reasoning, isReasoningStreaming, messageIndex, onBranch }: MessageCardProps) {
   const [ttsLoading, setTtsLoading] = useState(false);
+  const [reasoningOpen, setReasoningOpen] = useState(false);
+  const [showActions, setShowActions] = useState(false);
   const avatar = role === 'user' ? '👤' : role === 'assistant' ? '🤖' : role === 'tool' ? '⚙️' : '⚡';
 
   const handleTts = async () => {
@@ -54,8 +60,21 @@ export function MessageCard({ role, title, content, isStreaming }: MessageCardPr
     navigator.clipboard.writeText(text).catch(() => {});
   };
 
+  const handleBranch = () => {
+    if (onBranch && messageIndex !== undefined) {
+      onBranch(messageIndex);
+    }
+  };
+
+  const hasReasoning = !!(reasoning && reasoning.trim());
+
   return (
-    <article className={`message-card message-card-${role}`} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+    <article
+      className={`message-card message-card-${role}`}
+      style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', position: 'relative' }}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
       <div style={{ fontSize: '1.5rem', flexShrink: 0, opacity: 0.9 }}>{avatar}</div>
       <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
         <div className="message-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -81,6 +100,95 @@ export function MessageCard({ role, title, content, isStreaming }: MessageCardPr
             </button>
           )}
         </div>
+
+        {/* Collapsible Reasoning/Thinking Block */}
+        {(hasReasoning || isReasoningStreaming) && (
+          <div style={{
+            margin: '8px 0',
+            borderRadius: '10px',
+            background: 'rgba(251, 191, 36, 0.04)',
+            border: '1px solid rgba(251, 191, 36, 0.12)',
+            overflow: 'hidden',
+            transition: 'all 0.2s ease',
+          }}>
+            <button
+              type="button"
+              onClick={() => setReasoningOpen(!reasoningOpen)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '8px 12px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#fbbf24',
+                fontSize: '0.8rem',
+                fontWeight: 500,
+                textAlign: 'left',
+                transition: 'background 0.15s',
+              }}
+            >
+              <span style={{
+                display: 'inline-flex',
+                transition: 'transform 0.2s ease',
+                transform: reasoningOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                fontSize: '0.7rem',
+              }}>▶</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                💭 Thinking
+                {isReasoningStreaming && (
+                  <span style={{
+                    display: 'inline-block',
+                    width: '6px', height: '6px',
+                    borderRadius: '50%',
+                    background: '#fbbf24',
+                    animation: 'pulse 1.5s infinite',
+                  }} />
+                )}
+              </span>
+              {reasoning && (
+                <span style={{
+                  marginLeft: 'auto',
+                  fontSize: '0.7rem',
+                  color: '#92400e',
+                  opacity: 0.6,
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}>
+                  {reasoning.length.toLocaleString()} chars
+                </span>
+              )}
+            </button>
+            {reasoningOpen && (
+              <div style={{
+                padding: '0 12px 10px',
+                fontSize: '0.85rem',
+                lineHeight: 1.5,
+                color: '#d4a574',
+                fontStyle: 'italic',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                borderTop: '1px solid rgba(251, 191, 36, 0.08)',
+              }}>
+                {reasoning}
+                {isReasoningStreaming && (
+                  <span style={{
+                    display: 'inline-block',
+                    width: '2px', height: '1em',
+                    background: '#fbbf24',
+                    marginLeft: '2px',
+                    verticalAlign: 'text-bottom',
+                    animation: 'blink 1s step-end infinite',
+                  }} />
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="message-card-content markdown-body" style={{ wordBreak: 'break-word', overflowX: 'auto' }}>
           {role === 'assistant' || role === 'user' ? (
             <>
@@ -218,6 +326,59 @@ export function MessageCard({ role, title, content, isStreaming }: MessageCardPr
           )}
         </div>
       </div>
+
+      {/* Hover action buttons */}
+      {showActions && (role === 'assistant' || role === 'user') && (
+        <div style={{
+          position: 'absolute',
+          top: '4px',
+          right: '4px',
+          display: 'flex',
+          gap: '4px',
+          opacity: 0.8,
+        }}>
+          {role === 'assistant' && onBranch && messageIndex !== undefined && (
+            <button
+              type="button"
+              onClick={handleBranch}
+              title="Branch conversation from here"
+              style={{
+                background: 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                color: '#a5b4fc',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.7rem',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.15s',
+              }}
+            >
+              🌿 Branch
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => handleCopy(content)}
+            title="Copy message"
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#94a3b8',
+              padding: '3px 8px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.7rem',
+              transition: 'all 0.15s',
+            }}
+          >
+            📋
+          </button>
+        </div>
+      )}
     </article>
   );
 }

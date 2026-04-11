@@ -242,6 +242,15 @@ async def handle_chat_send(request: web.Request) -> web.Response:
             code="invalid_conversation_history",
             message="The 'conversation_history' field must be a list when provided.",
         )
+    if conversation_history is None:
+        try:
+            from hermes_state import SessionDB
+            db = SessionDB()
+            conversation_history = db.get_messages_as_conversation(session_id)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to load history from DB: %s", e)
+            conversation_history = []
 
     runtime_context = data.get("runtime_context")
     if runtime_context is not None and not isinstance(runtime_context, dict):
@@ -343,6 +352,21 @@ async def handle_chat_btw(request: web.Request) -> web.Response:
         return _json_error(status=400, code="invalid_session_id", message="The 'session_id' field must be a non-empty string when provided.")
 
     conversation_history = data.get("conversation_history")
+    if conversation_history is not None and not isinstance(conversation_history, list):
+        return _json_error(
+            status=400,
+            code="invalid_conversation_history",
+            message="The 'conversation_history' field must be a list when provided.",
+        )
+    if conversation_history is None:
+        try:
+            from hermes_state import SessionDB
+            db = SessionDB()
+            conversation_history = db.get_messages_as_conversation(session_id)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to load history from DB: %s", e)
+            conversation_history = []
     
     runtime_context = data.get("runtime_context", {})
     runtime_context["quick_ask"] = True
@@ -532,7 +556,15 @@ async def handle_chat_compress(request: web.Request) -> web.Response:
     # Initialize agent for context loading
     # Run in executor to not block async loop if it's slow
     def _do_compress():
-        agent = AIAgent(session_id=session_id)
+        try:
+            from hermes_state import SessionDB
+            session_db = SessionDB()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("SessionDB unavailable: %s", e)
+            session_db = None
+
+        agent = AIAgent(session_id=session_id, session_db=session_db)
         if len(agent.messages) < agent.context_compressor.protect_first_n + agent.context_compressor.protect_last_n + 1:
             return {"ok": True, "compressed": False, "reason": "not_enough_messages"}
             
