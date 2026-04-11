@@ -142,6 +142,14 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 
 ## 📜 Changelog
 
+### [2026.4.11b] - Critical Bugfix Sweep (7 Fixes)
+- **Transcript Loading Fix**: `ChatPage` was reading `res.transcript` instead of `res.items` — existing sessions never loaded messages on navigation.
+- **Session Search Endpoint**: Added missing `GET /api/gui/session-search` route backed by SessionDB FTS5 full-text search.
+- **Honest Stop/Undo Controls**: Stop and Undo buttons now respect the backend's `supported: false` response instead of lying to the user.
+- **Compress Crash Fix**: Fixed positional `_json_error()` calls in `handle_chat_compress` that caused 500 errors on invalid input (keyword-only params).
+- **Codex Provider Validation**: Model switching now validates both directions — switching FROM and TO `openai-codex` with incompatible models.
+- **Deep-Link Race Condition**: Health check no longer overwrites a deep-linked session transcript on mount.
+
 ### [2026.4.11] - CLI Parity: Reasoning, Monitoring, & Branching
 - **Streaming Reasoning Block**: Added live, collapsible reasoning UI elements handling `message.reasoning.delta` SSE events identically to CLI thinking visuals.
 - **Context Window Meter**: Active progress gauge injected to the TopBar analyzing prompt sizes vs model bounds dynamically. 
