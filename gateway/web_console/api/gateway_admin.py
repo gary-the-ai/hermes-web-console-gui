@@ -139,6 +139,10 @@ async def handle_gateway_platform_config_get(request: web.Request) -> web.Respon
     settings = settings_service.get_settings()
     platforms_config = settings.get("platforms", {})
     platform_config = platforms_config.get(platform_name, {})
+    
+    if "home_channel" in platform_config and isinstance(platform_config["home_channel"], dict):
+        platform_config["home_channel"] = platform_config["home_channel"].get("chat_id", "")
+        
     from hermes_cli.config import get_env_value
 
     env_map = {
@@ -206,6 +210,18 @@ async def handle_gateway_platform_config_patch(request: web.Request) -> web.Resp
         ]:
             if key in data:
                 save_env_value(env_var, data.pop(key))
+
+    home_channel_val = data.get("home_channel")
+    if home_channel_val is not None:
+        if isinstance(home_channel_val, str):
+            if home_channel_val.strip():
+                data["home_channel"] = {
+                    "platform": platform_name.lower(),
+                    "chat_id": home_channel_val,
+                    "name": "Home"
+                }
+            else:
+                data.pop("home_channel", None)
 
     # We must patch the token separately via env vars if it exists so it goes to .env
     token = data.pop("token", None)

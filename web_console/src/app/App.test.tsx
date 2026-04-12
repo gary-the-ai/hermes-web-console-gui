@@ -102,7 +102,7 @@ describe('App shell', () => {
       }
       if (url.includes('/api/gui/gateway/platforms')) {
         return new Response(
-          JSON.stringify({ ok: true, platforms: [{ platform: 'telegram', connected: true, enabled: true, configured: true, error: null }] }),
+          JSON.stringify({ ok: true, platforms: [{ key: 'telegram', label: 'Telegram', runtime_state: 'connected', enabled: true, configured: true }] }),
           { status: 200 }
         );
       }
@@ -110,7 +110,7 @@ describe('App shell', () => {
         return new Response(JSON.stringify({ ok: true, pairings: [] }), { status: 200 });
       }
       if (url.includes('/api/gui/gateway/overview')) {
-        return new Response(JSON.stringify({ ok: true, running: true, uptime: 100 }), { status: 200 });
+        return new Response(JSON.stringify({ ok: true, overview: { summary: { platform_count: 5, connected_platforms: 2, enabled_platforms: 3 } } }), { status: 200 });
       }
       if (url.includes('/api/gui/settings')) {
         return new Response(

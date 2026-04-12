@@ -181,6 +181,9 @@ _CORS_HEADERS = {
 
 
 if AIOHTTP_AVAILABLE:
+    # Aiohttp 3.9+ deprecates string keys for Application storage.
+    API_SERVER_ADAPTER_KEY = web.AppKey("api_server_adapter", object) if hasattr(web, "AppKey") else "api_server_adapter"
+
     @web.middleware
     async def cors_middleware(request, handler):
         """Add CORS headers for explicitly allowed origins; handle OPTIONS preflight.
@@ -191,7 +194,7 @@ if AIOHTTP_AVAILABLE:
         compatible API routes remain locked down to explicitly configured
         origins only.
         """
-        adapter = request.app.get("api_server_adapter")
+        adapter = request.app.get(API_SERVER_ADAPTER_KEY)
         origin = request.headers.get("Origin", "")
 
         # Auto-allow any browser origin for web console GUI routes
@@ -1770,7 +1773,7 @@ class APIServerAdapter(BasePlatformAdapter):
         try:
             mws = [mw for mw in (cors_middleware, body_limit_middleware, security_headers_middleware) if mw is not None]
             self._app = web.Application(middlewares=mws)
-            self._app["api_server_adapter"] = self
+            self._app[API_SERVER_ADAPTER_KEY] = self
             
             # Register base routes and web console
             self._register_routes(self._app)

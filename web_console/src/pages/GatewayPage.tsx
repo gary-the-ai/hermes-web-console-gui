@@ -73,7 +73,7 @@ export function GatewayPage() {
       });
     }
 
-    if (platRes?.ok && platRes.platforms.length > 0) {
+    if (platRes?.ok && platRes.platforms) {
       setPlatforms(
         platRes.platforms.map((p) => ({
           id: p.key,

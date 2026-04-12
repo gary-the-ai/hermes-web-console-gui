@@ -42,7 +42,7 @@ export function PlatformConfigModal({ platformId, onClose, onSaved }: PlatformCo
   };
 
   const getFieldsForPlatform = () => {
-    const fields = [
+    let fields = [
       { key: 'token', label: 'Bot Token', type: 'password', placeholder: 'Enter API Token' },
     ];
     
@@ -59,15 +59,45 @@ export function PlatformConfigModal({ platformId, onClose, onSaved }: PlatformCo
       fields.push({ key: 'app_token', label: 'App Token (xapp-...)', type: 'password', placeholder: 'Optional' });
       fields.push({ key: 'signing_secret', label: 'Signing Secret', type: 'password', placeholder: 'Optional' });
     } else if (platformId === 'feishu') {
-      fields.pop(); // Remove standard token
+      fields = []; // Remove standard token
       fields.push({ key: 'app_id', label: 'App ID', type: 'text', placeholder: 'cli_...' });
       fields.push({ key: 'app_secret', label: 'App Secret', type: 'password', placeholder: 'Secret' });
       fields.push({ key: 'verification_token', label: 'Verification Token', type: 'password', placeholder: 'Optional' });
       fields.push({ key: 'encrypt_key', label: 'Encrypt Key', type: 'password', placeholder: 'Optional' });
     } else if (platformId === 'wecom') {
-      fields.pop(); // Remove standard token
+      fields = []; // Remove standard token
       fields.push({ key: 'bot_id', label: 'Bot ID', type: 'text', placeholder: 'Bot ID' });
       fields.push({ key: 'secret', label: 'Secret', type: 'password', placeholder: 'Secret' });
+    } else if (platformId === 'mattermost') {
+      fields.push({ key: 'url', label: 'Mattermost URL', type: 'text', placeholder: 'https://...' });
+      fields.push({ key: 'bot_id', label: 'Bot ID', type: 'text', placeholder: 'Optional' });
+      fields.push({ key: 'webhook_port', label: 'Webhook Port', type: 'text', placeholder: 'Optional' });
+    } else if (platformId === 'matrix') {
+      fields.push({ key: 'homeserver', label: 'Homeserver URL', type: 'text', placeholder: 'https://matrix.org' });
+      fields.push({ key: 'username', label: 'Username', type: 'text', placeholder: '@bot:matrix.org' });
+      fields.push({ key: 'password', label: 'Password (if no token)', type: 'password', placeholder: 'Optional' });
+    } else if (platformId === 'homeassistant') {
+      fields.push({ key: 'url', label: 'Home Assistant URL', type: 'text', placeholder: 'https://...' });
+      fields.push({ key: 'agent_id', label: 'Conversation Agent ID', type: 'text', placeholder: 'Optional' });
+    } else if (platformId === 'signal') {
+      fields = [];
+      fields.push({ key: 'http_url', label: 'Signal-CLI HTTP URL', type: 'text', placeholder: 'http://127.0.0.1:8080' });
+      fields.push({ key: 'account', label: 'Phone Number Account', type: 'text', placeholder: '+1234567890' });
+    } else if (platformId === 'bluebubbles') {
+      fields = [];
+      fields.push({ key: 'server_url', label: 'Server URL', type: 'text', placeholder: 'https://...' });
+      fields.push({ key: 'password', label: 'Password', type: 'password', placeholder: 'Secret' });
+    } else if (platformId === 'email') {
+      fields = [];
+      fields.push({ key: 'address', label: 'Email Address', type: 'text', placeholder: 'bot@example.com' });
+      fields.push({ key: 'imap_host', label: 'IMAP Host', type: 'text', placeholder: 'imap.example.com' });
+      fields.push({ key: 'imap_user', label: 'IMAP User', type: 'text', placeholder: 'bot@example.com' });
+      fields.push({ key: 'imap_pass', label: 'IMAP Password', type: 'password', placeholder: 'Secret' });
+      fields.push({ key: 'smtp_host', label: 'SMTP Host', type: 'text', placeholder: 'smtp.example.com' });
+      fields.push({ key: 'smtp_user', label: 'SMTP User', type: 'text', placeholder: 'bot@example.com' });
+      fields.push({ key: 'smtp_pass', label: 'SMTP Password', type: 'password', placeholder: 'Secret' });
+    } else if (platformId === 'whatsapp' || platformId === 'sms' || platformId === 'webhook' || platformId === 'api_server' || platformId === 'cli') {
+      fields = [];
     }
     
     return fields;
