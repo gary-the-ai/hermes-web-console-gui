@@ -41,9 +41,15 @@ describe('App shell', () => {
           { status: 200 }
         );
       }
+      if (url.includes('/api/gui/user-profile')) {
+        return new Response(
+          JSON.stringify({ ok: true, user_profile: { target: 'user', enabled: true, entries: ['Likes dark mode.'], entry_count: 1, usage: { text: '1%', percent: 1, current_chars: 16, char_limit: 1375 }, path: '/tmp/USER.md' } }),
+          { status: 200 }
+        );
+      }
       if (url.includes('/api/gui/memory')) {
         return new Response(
-          JSON.stringify({ ok: true, content: 'Test memory entry.' }),
+          JSON.stringify({ ok: true, memory: { target: 'memory', enabled: true, entries: ['Test memory entry.'], entry_count: 1, usage: { text: '1%', percent: 1, current_chars: 18, char_limit: 2200 }, path: '/tmp/MEMORY.md' } }),
           { status: 200 }
         );
       }

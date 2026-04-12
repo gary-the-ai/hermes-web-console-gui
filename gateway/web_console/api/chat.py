@@ -13,7 +13,7 @@ from aiohttp import web
 
 from gateway.web_console.api.approvals import HUMAN_SERVICE_APP_KEY
 from gateway.web_console.services.chat_service import ChatService
-from gateway.web_console.state import get_web_console_state
+from gateway.web_console.state import create_web_console_state, get_web_console_state
 
 CHAT_SERVICE_APP_KEY = web.AppKey("hermes_web_console_chat_service", ChatService)
 CHAT_STATE_APP_KEY = web.AppKey("hermes_web_console_chat_state", object)
@@ -38,7 +38,7 @@ def _get_chat_service(request: web.Request) -> ChatService:
     if service is None:
         state = request.app.get(CHAT_STATE_APP_KEY)
         if state is None:
-            state = get_web_console_state()
+            state = create_web_console_state()
             request.app[CHAT_STATE_APP_KEY] = state
         human_service = request.app.get(HUMAN_SERVICE_APP_KEY)
         service = ChatService(state=state, human_service=human_service)
@@ -600,7 +600,7 @@ def register_chat_api_routes(app: web.Application) -> None:
     """Register web-console chat API routes on an aiohttp application."""
     _get_chat_tasks(app)
     if app.get(CHAT_STATE_APP_KEY) is None:
-        app[CHAT_STATE_APP_KEY] = get_web_console_state()
+        app[CHAT_STATE_APP_KEY] = create_web_console_state()
     if app.get(CHAT_SERVICE_APP_KEY) is None:
         app[CHAT_SERVICE_APP_KEY] = ChatService(
             state=app[CHAT_STATE_APP_KEY],

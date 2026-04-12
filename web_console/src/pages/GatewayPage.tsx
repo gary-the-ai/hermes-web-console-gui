@@ -36,7 +36,17 @@ interface PairingResponse {
 
 interface OverviewResponse {
   ok: boolean;
-  overview?: { total?: number; connected?: number; enabled?: number };
+  overview?: {
+    gateway?: { running?: boolean; pid?: number; state?: string; exit_reason?: string | null; updated_at?: string };
+    summary?: {
+      platform_count?: number;
+      enabled_platforms?: number;
+      configured_platforms?: number;
+      connected_platforms?: number;
+      pending_pairings?: number;
+      approved_pairings?: number;
+    };
+  };
 }
 
 export function GatewayPage() {
@@ -55,10 +65,11 @@ export function GatewayPage() {
     ]);
 
     if (overviewRes?.ok && overviewRes.overview) {
+      const summary = overviewRes.overview.summary;
       setOverview({
-        total: overviewRes.overview.total ?? 0,
-        connected: overviewRes.overview.connected ?? 0,
-        enabled: overviewRes.overview.enabled ?? 0,
+        total: summary?.platform_count ?? 0,
+        connected: summary?.connected_platforms ?? 0,
+        enabled: summary?.enabled_platforms ?? 0,
       });
     }
 
