@@ -212,6 +212,24 @@ async def handle_workspace_file_save(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, **result})
 
 
+async def handle_workspace_exec(request: web.Request) -> web.Response:
+    data = await _read_json_body(request)
+    if data is None:
+        return _json_error(status=400, code="invalid_json", message="Request body must be a valid JSON object.")
+    command = data.get("command")
+    if not isinstance(command, str) or not command.strip():
+        return _json_error(status=400, code="missing_command", message="The 'command' field must be a non-empty string.")
+
+    service = _get_workspace_service(request)
+    try:
+        result = service.execute_sync(command)
+    except ValueError as exc:
+        return _json_error(status=400, code="invalid_command", message=str(exc))
+    except RuntimeError as exc:
+        return _json_error(status=500, code="execution_failed", message=str(exc))
+    return web.json_response({"ok": True, **result})
+
+
 def register_workspace_api_routes(app: web.Application) -> None:
     if app.get(WORKSPACE_SERVICE_APP_KEY) is None:
         app[WORKSPACE_SERVICE_APP_KEY] = WorkspaceService()
@@ -223,6 +241,7 @@ def register_workspace_api_routes(app: web.Application) -> None:
     app.router.add_get("/api/gui/workspace/diff", handle_workspace_diff)
     app.router.add_get("/api/gui/workspace/checkpoints", handle_workspace_checkpoints)
     app.router.add_post("/api/gui/workspace/rollback", handle_workspace_rollback)
+    app.router.add_post("/api/gui/workspace/exec", handle_workspace_exec)
     app.router.add_get("/api/gui/processes", handle_list_processes)
     app.router.add_get("/api/gui/processes/{process_id}/log", handle_process_log)
     app.router.add_post("/api/gui/processes/{process_id}/kill", handle_kill_process)

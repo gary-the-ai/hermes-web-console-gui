@@ -349,3 +349,33 @@ class WorkspaceService:
         if result.get("status") == "error":
             raise RuntimeError(result.get("error") or "Could not kill process.")
         return result
+
+    def execute_sync(self, command: str) -> dict[str, Any]:
+        if not command or not command.strip():
+            raise ValueError("Command cannot be empty.")
+        import subprocess
+        try:
+            # Setting a 10s timeout so this doesn't hang the GUI thread if someone runs `sleep 100` or a repl.
+            result = subprocess.run(
+                command,
+                shell=True,
+                cwd=str(self.workspace_root),
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            return {
+                "cwd": str(self.workspace_root),
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "returncode": result.returncode
+            }
+        except subprocess.TimeoutExpired as e:
+            return {
+                "cwd": str(self.workspace_root),
+                "stdout": e.stdout or "",
+                "stderr": (e.stderr or "") + f"\n[Process timed out after 10s]",
+                "returncode": -1
+            }
+        except Exception as e:
+            raise RuntimeError(f"Command execution failed: {e}")

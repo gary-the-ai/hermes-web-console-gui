@@ -57,7 +57,7 @@ export function applyTheme(config: ThemeConfig) {
 }
 
 // Subscribe to system theme changes if we are on 'system' mode
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
   window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
     const current = loadTheme();
     if (current.mode === 'system') {

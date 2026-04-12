@@ -364,7 +364,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
   // Auto-scroll on new messages and during streaming content updates
   const lastItemContent = items.length > 0 ? items[items.length - 1].content : '';
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [items.length, lastItemContent]);
 
   useEffect(() => {

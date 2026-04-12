@@ -19,8 +19,8 @@ interface WorkspaceFileResponse { ok: boolean; path: string; content: string; }
 interface WorkspaceDiffResponse { ok: boolean; diff?: string; }
 interface WorkspaceCheckpointResponse { ok: boolean; checkpoints?: Array<{ checkpoint_id?: string; label?: string }>; }
 interface ProcessesResponse { ok: boolean; processes?: Array<{ process_id?: string; status?: string }>; }
-interface ProcessLogResponse { ok: boolean; log?: string; }
-interface WorkspaceSearchResponse { ok: boolean; results?: Array<{ path: string; line?: number; snippet?: string }>; }
+interface ProcessLogResponse { ok: boolean; output?: string; }
+interface WorkspaceSearchResponse { ok: boolean; matches?: Array<{ path: string; line?: number; content?: string }>; }
 
 function flattenTree(node: WorkspaceTreeNode | undefined): string[] {
   if (!node) return [];
@@ -108,8 +108,8 @@ export function WorkspacePage() {
   const handleViewLog = async (processId: string) => {
     try {
       const res = await apiClient.get<ProcessLogResponse>(`/processes/${processId}/log`);
-      if (res.ok && res.log) {
-        setFileContent(`=== Process Log: ${processId} ===\n\n${res.log}`);
+      if (res.ok && res.output) {
+        setFileContent(`=== Process Log: ${processId} ===\n\n${res.output}`);
       }
     } catch {
       setFileContent('Failed to load process log.');
@@ -120,10 +120,10 @@ export function WorkspacePage() {
     if (!searchQuery.trim()) return;
     try {
       const res = await apiClient.get<WorkspaceSearchResponse>(`/workspace/search?q=${encodeURIComponent(searchQuery)}`);
-      if (res.ok && res.results) {
-        setSearchResults(res.results.map((r) => ({
+      if (res.ok && res.matches) {
+        setSearchResults(res.matches.map((r) => ({
           path: r.path,
-          snippet: r.snippet ?? `Line ${r.line ?? '?'}`,
+          snippet: r.content ?? `Line ${r.line ?? '?'}`,
         })));
       }
     } catch {
