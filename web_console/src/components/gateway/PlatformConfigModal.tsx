@@ -64,6 +64,11 @@ export function PlatformConfigModal({ platformId, onClose, onSaved }: PlatformCo
       fields.push({ key: 'app_secret', label: 'App Secret', type: 'password', placeholder: 'Secret' });
       fields.push({ key: 'verification_token', label: 'Verification Token', type: 'password', placeholder: 'Optional' });
       fields.push({ key: 'encrypt_key', label: 'Encrypt Key', type: 'password', placeholder: 'Optional' });
+    } else if (platformId === 'weixin') {
+      fields = []; // Remove standard token
+      fields.push({ key: 'token', label: 'WeChat Token', type: 'password', placeholder: 'Token' });
+      fields.push({ key: 'account_id', label: 'Account ID', type: 'text', placeholder: 'gh_...' });
+      fields.push({ key: 'base_url', label: 'Base URL', type: 'text', placeholder: 'Optional (e.g. https://api.weixin.qq.com)' });
     } else if (platformId === 'wecom') {
       fields = []; // Remove standard token
       fields.push({ key: 'bot_id', label: 'Bot ID', type: 'text', placeholder: 'Bot ID' });
