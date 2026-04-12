@@ -551,6 +551,8 @@ async def handle_chat_compress(request: web.Request) -> web.Response:
     if not isinstance(session_id, str) or not session_id:
         return _json_error(status=400, code="invalid_session_id", message="The 'session_id' field must be a non-empty string.")
 
+    focus_topic = data.get("focus_topic")  # Optional guided compression topic
+
     from run_agent import AIAgent
     
     # Initialize agent for context loading
@@ -569,11 +571,14 @@ async def handle_chat_compress(request: web.Request) -> web.Response:
             return {"ok": True, "compressed": False, "reason": "not_enough_messages"}
             
         orig_len = len(agent.messages)
-        agent.messages = agent.context_compressor.compress(agent.messages)
+        compress_kwargs = {}
+        if focus_topic:
+            compress_kwargs["focus_topic"] = focus_topic
+        agent.messages = agent.context_compressor.compress(agent.messages, **compress_kwargs)
         
         if len(agent.messages) < orig_len:
             agent._flush_messages_to_session_db()
-            return {"ok": True, "compressed": True, "original_length": orig_len, "new_length": len(agent.messages)}
+            return {"ok": True, "compressed": True, "original_length": orig_len, "new_length": len(agent.messages), "focus_topic": focus_topic or None}
         else:
             return {"ok": True, "compressed": False, "reason": "no_reduction"}
 

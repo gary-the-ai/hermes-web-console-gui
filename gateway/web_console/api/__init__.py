@@ -26,6 +26,7 @@ from .mcp import register_mcp_api_routes
 from .usage import register_usage_api_routes
 from .missions import register_missions_api_routes
 from .credentials import register_credentials_api_routes
+from .system import register_system_api_routes
 
 
 def register_web_console_api_routes(app: web.Application) -> None:
@@ -52,6 +53,7 @@ def register_web_console_api_routes(app: web.Application) -> None:
     register_usage_api_routes(app)
     register_missions_api_routes(app)
     register_credentials_api_routes(app)
+    register_system_api_routes(app)
 
 
 __all__ = [
@@ -78,4 +80,5 @@ __all__ = [
     "register_usage_api_routes",
     "register_missions_api_routes",
     "register_credentials_api_routes",
+    "register_system_api_routes",
 ]

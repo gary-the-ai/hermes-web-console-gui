@@ -584,12 +584,23 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
             <button
               type="button"
               onClick={async () => {
-                setItems((prev) => [...prev, { role: 'system', title: 'System', content: '🗜️ Compressing context...' }]);
+                const focusTopic = window.prompt(
+                  '🗜️ Guided Compression\n\nOptionally enter a focus topic to preserve context around (leave empty for general compression):',
+                  ''
+                );
+                // User cancelled
+                if (focusTopic === null) return;
+                
+                setItems((prev) => [...prev, { role: 'system', title: 'System', content: focusTopic ? `🗜️ Compressing context (focus: "${focusTopic}")...` : '🗜️ Compressing context...' }]);
                 try {
-                  const res = await apiClient.post<{ok: boolean, compressed: boolean, reason?: string, original_length?: number, new_length?: number}>('/chat/compress', { session_id: sessionId });
+                  const payload: any = { session_id: sessionId };
+                  if (focusTopic.trim()) payload.focus_topic = focusTopic.trim();
+                  
+                  const res = await apiClient.post<{ok: boolean, compressed: boolean, reason?: string, original_length?: number, new_length?: number, focus_topic?: string}>('/chat/compress', payload);
                   if (res.compressed) {
                     await loadSession(sessionId);
-                    setItems((prev) => [...prev, { role: 'system', title: 'System', content: `✓ Context compressed from ${res.original_length} to ${res.new_length} messages.` }]);
+                    const focusNote = res.focus_topic ? ` (focus: "${res.focus_topic}")` : '';
+                    setItems((prev) => [...prev, { role: 'system', title: 'System', content: `✓ Context compressed from ${res.original_length} to ${res.new_length} messages${focusNote}.` }]);
                   } else {
                     setItems((prev) => [...prev, { role: 'system', title: 'System', content: `ℹ️ Compression skipped: ${res.reason}` }]);
                   }

@@ -40,6 +40,7 @@ export function LogsPage() {
   const [availableFiles, setAvailableFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [minLevel, setMinLevel] = useState<string>('ALL');
+  const [searchFilter, setSearchFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [autoScroll, setAutoScroll] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -77,7 +78,12 @@ export function LogsPage() {
     }
   }, [lines, autoScroll]);
 
-  const filteredLines = lines.filter(line => shouldShowLine(line, minLevel));
+  const lowerSearch = searchFilter.toLowerCase();
+  const filteredLines = lines.filter(line => {
+    if (!shouldShowLine(line, minLevel)) return false;
+    if (lowerSearch && !line.toLowerCase().includes(lowerSearch)) return false;
+    return true;
+  });
 
   const levelCounts = lines.reduce<Record<string, number>>((acc, line) => {
     const level = getLineLevel(line);
@@ -149,6 +155,26 @@ export function LogsPage() {
             </option>
           ))}
         </select>
+
+        {/* Text search filter */}
+        <input
+          type="text"
+          placeholder="🔍 Filter (session ID, tool, keyword…)"
+          value={searchFilter}
+          onChange={(e) => setSearchFilter(e.target.value)}
+          style={{
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '6px',
+            color: '#e2e8f0',
+            padding: '4px 10px',
+            fontSize: '0.78rem',
+            fontFamily: "'JetBrains Mono', monospace",
+            outline: 'none',
+            minWidth: '180px',
+            flex: '0 1 240px',
+          }}
+        />
 
         {/* Level counts badges */}
         <div style={{ display: 'flex', gap: '6px', marginLeft: '4px' }}>

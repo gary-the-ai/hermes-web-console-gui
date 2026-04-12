@@ -5,6 +5,7 @@ import { ModelPicker } from '../components/settings/ModelPicker';
 import { ProviderManager } from '../components/settings/ProviderManager';
 import { ApiKeyManager } from '../components/settings/ApiKeyManager';
 import { ProfileManager } from '../components/settings/ProfileManager';
+import { SystemManager } from '../components/settings/SystemManager';
 import { PluginList } from '../components/settings/PluginList';
 import { McpServerList } from '../components/settings/McpServerList';
 import { ThemeSettings } from '../components/settings/ThemeSettings';
@@ -204,6 +205,7 @@ export function SettingsPage() {
       {categories && <SettingsForm categories={categories} onSave={handleSave} />}
       <ApiKeyManager />
       <ProfileManager />
+      <SystemManager />
       <PluginList />
       <McpServerList />
     </div>
