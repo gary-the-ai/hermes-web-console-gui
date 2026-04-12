@@ -61,6 +61,8 @@ Here is a glimpse of the gorgeous new interfaces powering your agent:
 - **CLI Session Bridge**: Seamlessly view and interact with CLI terminal sessions and memory straight from the web console.
 - **Offline Portable Mode**: Fallback to local offline mode with graceful degradation when the backend is unreachable. 
 - **Zero-Config Hosted Mode**: Access the web console natively online without installing additional tools. Connects seamlessly to your local Hermes daemon remotely using automated CORS tunneling.
+- **Guided Context Compression 🗜️**: Manually or automatically compress over-extended context windows while isolating specific focal topics seamlessly from the chat UI.
+- **System Backup & Restore 💾**: Full zip snapshot capabilities bridging browser downloads directly against your offline config states and sql databases.
 - **Missions Kanban**: Create, drag-and-drop, and monitor agentic missions on a comprehensive visual board.
 - **Workspace Integration**: Mentioning files with `@` directly links to your file explorer context. Rich dropzones power native vision multi-modal interactions.
 - **PWA Support**: Full manifest and service worker deployment for native standalone app-like installations across Desktop and Mobile.
@@ -142,6 +144,12 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 ---
 
 ## 📜 Changelog
+
+### [2026.4.12b] - Upstream Sync & Infrastructure Enhancements
+- **Guided Context Compression**: Added 'focus_topic' injections gracefully extending context compression strategies directly from the UI chat.
+- **System Backup & Restore**: New Settings card exposing one-click zip archive downloads (`~/.hermes`) and GUI file upload restorations seamlessly mirroring the new CLI capability.
+- **Structured Log Filtering**: Upgraded the logs dashboard with text-based keywords and session ID regex filtering to navigate upstream debugging changes efficiently.
+- **Massive Upstream Pull**: Synced 150+ upstream `NousResearch/hermes-agent` commits preserving full parity without corrupting legacy UI endpoints.
 
 ### [2026.4.12] - Zero-Config Hosted GUI Deployment
 - **Zero-Friction Live GUI**: Completely decoupled the frontend static build from the Python backend natively allowing production Cloudflare Pages zero-config deployments.
