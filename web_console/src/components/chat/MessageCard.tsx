@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { apiClient } from '../../lib/api';
+import { getBackendUrl } from '../../store/backendStore';
 
 interface MessageCardProps {
   role: 'user' | 'assistant' | 'tool' | 'system';
@@ -35,7 +36,7 @@ export function MessageCard({ role, title, content, isStreaming, reasoning, isRe
       if (res.ok && res.tts?.audio_file) {
         // Fetch the audio file as a blob since the backend returns a filesystem path
         try {
-          const audioRes = await fetch(`/api/gui/workspace/file?path=${encodeURIComponent(res.tts.audio_file)}`);
+          const audioRes = await fetch(`${getBackendUrl()}/api/gui/workspace/file?path=${encodeURIComponent(res.tts.audio_file)}`);
           if (audioRes.ok) {
             const blob = await audioRes.blob();
             const url = URL.createObjectURL(blob);

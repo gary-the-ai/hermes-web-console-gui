@@ -1,3 +1,5 @@
+import { getBackendUrl } from '../store/backendStore';
+
 export interface EventSubscription {
   close(): void;
 }
@@ -13,7 +15,8 @@ export interface GuiEvent {
 export type EventStreamCallback = (event: GuiEvent) => void;
 
 export function openSessionEventStream(sessionId: string, onMessage: EventStreamCallback): EventSubscription {
-  const url = `/api/gui/stream/session/${encodeURIComponent(sessionId)}`;
+  const base = getBackendUrl();
+  const url = `${base}/api/gui/stream/session/${encodeURIComponent(sessionId)}`;
   const source = new EventSource(url);
 
   source.onmessage = (raw) => {

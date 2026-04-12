@@ -1,12 +1,21 @@
+import { getBackendUrl } from '../store/backendStore';
+
 export interface ApiClientOptions {
   baseUrl?: string;
 }
 
 export class ApiClient {
-  private readonly baseUrl: string;
+  private readonly _baseUrlOverride?: string;
 
   constructor(options: ApiClientOptions = {}) {
-    this.baseUrl = options.baseUrl ?? '/api/gui';
+    this._baseUrlOverride = options.baseUrl;
+  }
+
+  /** Resolve the API base URL dynamically so hosted-mode URL changes are picked up. */
+  private get baseUrl(): string {
+    if (this._baseUrlOverride) return this._baseUrlOverride;
+    const backend = getBackendUrl();
+    return backend ? `${backend}/api/gui` : '/api/gui';
   }
 
   async get<T>(path: string): Promise<T> {

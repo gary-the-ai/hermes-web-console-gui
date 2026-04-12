@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
+import { getBackendUrl } from '../store/backendStore';
 import './InsightsPage.css';
 
 interface GlobalMetrics {
@@ -52,7 +53,7 @@ export function InsightsPage() {
     let active = true;
     async function fetchMetrics() {
       try {
-        const res = await fetch('/api/gui/metrics/global');
+        const res = await fetch(`${getBackendUrl()}/api/gui/metrics/global`);
         if (!res.ok) return;
         const data = await res.json();
         if (data.ok && active) {
@@ -76,7 +77,7 @@ export function InsightsPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/gui/usage/insights?days=${days}`);
+        const res = await fetch(`${getBackendUrl()}/api/gui/usage/insights?days=${days}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data.ok) {

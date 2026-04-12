@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { getBackendUrl } from '../store/backendStore';
 
 interface KanbanCard {
   id: string;
@@ -39,7 +40,7 @@ export function MissionsPage() {
   const saveTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    fetch('/api/gui/missions')
+    fetch(`${getBackendUrl()}/api/gui/missions`)
       .then(res => res.json())
       .then(data => {
         if (data.ok && data.columns) {
@@ -54,7 +55,7 @@ export function MissionsPage() {
     setColumns(newCols);
     if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = window.setTimeout(() => {
-      fetch('/api/gui/missions', {
+      fetch(`${getBackendUrl()}/api/gui/missions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ columns: newCols })

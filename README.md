@@ -60,6 +60,7 @@ Here is a glimpse of the gorgeous new interfaces powering your agent:
 - **Dashboard Command Center**: Real-time observability dashboard streaming CPU, memory, Process, and Cron active metrics directly from the host.
 - **CLI Session Bridge**: Seamlessly view and interact with CLI terminal sessions and memory straight from the web console.
 - **Offline Portable Mode**: Fallback to local offline mode with graceful degradation when the backend is unreachable. 
+- **Zero-Config Hosted Mode**: Access the web console natively online without installing additional tools. Connects seamlessly to your local Hermes daemon remotely using automated CORS tunneling.
 - **Missions Kanban**: Create, drag-and-drop, and monitor agentic missions on a comprehensive visual board.
 - **Workspace Integration**: Mentioning files with `@` directly links to your file explorer context. Rich dropzones power native vision multi-modal interactions.
 - **PWA Support**: Full manifest and service worker deployment for native standalone app-like installations across Desktop and Mobile.
@@ -141,6 +142,12 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 ---
 
 ## 📜 Changelog
+
+### [2026.4.12] - Zero-Config Hosted GUI Deployment
+- **Zero-Friction Live GUI**: Completely decoupled the frontend static build from the Python backend natively allowing production Cloudflare Pages zero-config deployments.
+- **Auto-CORS API Pipeline**: Middleware auto-injected over `/api/gui/*` enabling secure browser cross-origin requests from the remote domain exclusively without modifying `.env` secrets.
+- **Dynamic Connection Store**: Restructured the frontend generic `fetch` and EventSource layers fetching connection logic centrally from `backendStore.ts`.
+- **ConnectGate Overlay**: Wrote a gorgeous fallback connection testing screen intercepting users without local active sessions.
 
 ### [2026.4.11b] - Critical Bugfix Sweep (7 Fixes)
 - **Transcript Loading Fix**: `ChatPage` was reading `res.transcript` instead of `res.items` — existing sessions never loaded messages on navigation.

@@ -182,11 +182,27 @@ _CORS_HEADERS = {
 if AIOHTTP_AVAILABLE:
     @web.middleware
     async def cors_middleware(request, handler):
-        """Add CORS headers for explicitly allowed origins; handle OPTIONS preflight."""
+        """Add CORS headers for explicitly allowed origins; handle OPTIONS preflight.
+
+        Web console GUI routes (/api/gui/*) are automatically CORS-open so
+        the hosted GUI (e.g. hermes.gary-labs.online) can connect to a user's
+        local backend without any .env configuration.  The /v1/* OpenAI-
+        compatible API routes remain locked down to explicitly configured
+        origins only.
+        """
         adapter = request.app.get("api_server_adapter")
         origin = request.headers.get("Origin", "")
+
+        # Auto-allow any browser origin for web console GUI routes
+        is_gui_route = request.path.startswith("/api/gui/")
+
         cors_headers = None
-        if adapter is not None:
+        if is_gui_route and origin:
+            cors_headers = dict(_CORS_HEADERS)
+            cors_headers["Access-Control-Allow-Origin"] = origin
+            cors_headers["Vary"] = "Origin"
+            cors_headers["Access-Control-Max-Age"] = "600"
+        elif adapter is not None:
             if not adapter._origin_allowed(origin):
                 return web.Response(status=403)
             cors_headers = adapter._cors_headers_for_origin(origin)

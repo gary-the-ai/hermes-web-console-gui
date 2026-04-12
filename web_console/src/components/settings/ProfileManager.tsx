@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../../lib/api';
+import { getBackendUrl } from '../../store/backendStore';
 import { toastStore } from '../../store/toastStore';
 
 interface ProfileInfo {
@@ -123,7 +124,7 @@ export function ProfileManager() {
 
   const handleExport = (name: string) => {
     // Navigate to the file export API path to prompt standard browser download
-    const url = `/api/gui/profiles/${name}/export`;
+    const url = `${getBackendUrl()}/api/gui/profiles/${name}/export`;
     window.open(url, '_blank');
   };
 
@@ -137,7 +138,7 @@ export function ProfileManager() {
       // Optional: Ask for a renamed profile name? Left out for inference by backend
       
       setLoading(true);
-      const res = await fetch('/api/gui/profiles/import', {
+      const res = await fetch(`${getBackendUrl()}/api/gui/profiles/import`, {
         method: 'POST',
         body: formData
       });

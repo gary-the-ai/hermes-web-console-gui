@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { apiClient } from '../../lib/api';
+import { getBackendUrl } from '../../store/backendStore';
 import { toastStore } from '../../store/toastStore';
 
 interface SessionPreviewProps {
@@ -19,7 +20,7 @@ export function SessionPreview({ title, summary, transcript, sessionId }: Sessio
       // In a real app we might use window.location.href to trigger a download,
       // but Since apiClient does not support blob responses intuitively, we can fetch
       // it and then create a blob URL to download.
-      const response = await fetch(`/api/gui/sessions/${sessionId}/export?format=${format}`);
+      const response = await fetch(`${getBackendUrl()}/api/gui/sessions/${sessionId}/export?format=${format}`);
       if (!response.ok) throw new Error('Export failed to generate on server.');
       const blob = await response.blob();
       
