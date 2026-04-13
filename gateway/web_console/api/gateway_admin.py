@@ -296,6 +296,39 @@ async def handle_gateway_platform_stop(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "reload_required": True})
 
 
+async def handle_gateway_restart(request: web.Request) -> web.Response:
+    from gateway.web_console.routes import ADAPTER_APP_KEY
+
+    adapter = request.app.get(ADAPTER_APP_KEY)
+    message_handler = getattr(adapter, "_message_handler", None)
+    runner = getattr(message_handler, "__self__", None)
+    request_restart = getattr(runner, "request_restart", None)
+    if not callable(request_restart):
+        return _json_error(
+            status=501,
+            code="restart_unsupported",
+            message="Gateway restart is not available from this web-console host.",
+        )
+
+    try:
+        accepted = bool(request_restart(detached=True, via_service=False))
+    except Exception as exc:
+        return _json_error(status=500, code="restart_failed", message=str(exc))
+
+    if not accepted:
+        return web.json_response({
+            "ok": True,
+            "accepted": False,
+            "message": "Gateway restart is already in progress.",
+        })
+
+    return web.json_response({
+        "ok": True,
+        "accepted": True,
+        "message": "Gateway restart requested. Active runs will drain before restart.",
+    })
+
+
 def register_gateway_admin_api_routes(app: web.Application) -> None:
     if app.get(GATEWAY_SERVICE_APP_KEY) is None:
         app[GATEWAY_SERVICE_APP_KEY] = GatewayService()
@@ -306,6 +339,7 @@ def register_gateway_admin_api_routes(app: web.Application) -> None:
     app.router.add_patch("/api/gui/gateway/platforms/{name}/config", handle_gateway_platform_config_patch)
     app.router.add_post("/api/gui/gateway/platforms/{name}/start", handle_gateway_platform_start)
     app.router.add_post("/api/gui/gateway/platforms/{name}/stop", handle_gateway_platform_stop)
+    app.router.add_post("/api/gui/gateway/restart", handle_gateway_restart)
     app.router.add_get("/api/gui/gateway/pairing", handle_gateway_pairing)
     app.router.add_post("/api/gui/gateway/pairing/approve", handle_gateway_pairing_approve)
     app.router.add_post("/api/gui/gateway/pairing/revoke", handle_gateway_pairing_revoke)

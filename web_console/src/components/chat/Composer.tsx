@@ -23,47 +23,30 @@ interface ComposerProps {
   onReasoningChange?: (value: string) => void;
 }
 
-/** Built-in slash commands for autocomplete */
-const SLASH_COMMANDS: { name: string; description: string }[] = [
+interface CommandRegistryEntry {
+  name: string;
+  description: string;
+  aliases?: string[];
+  names?: string[];
+}
+
+interface CommandsResponse {
+  ok: boolean;
+  commands: CommandRegistryEntry[];
+}
+
+interface SlashCommandOption {
+  name: string;
+  description: string;
+}
+
+const FALLBACK_SLASH_COMMANDS: SlashCommandOption[] = [
   { name: '/new', description: 'Start a new session (fresh session ID + history)' },
   { name: '/reset', description: 'Start a new session (alias for /new)' },
-  { name: '/clear', description: 'Clear screen and start a new session' },
-  { name: '/history', description: 'Show conversation history' },
-  { name: '/save', description: 'Save the current conversation' },
-  { name: '/retry', description: 'Retry the last message (resend to agent)' },
-  { name: '/undo', description: 'Remove the last user/assistant exchange' },
-  { name: '/title', description: 'Set a title for the current session' },
-  { name: '/compress', description: 'Manually compress conversation context' },
-  { name: '/rollback', description: 'List or restore filesystem checkpoints' },
-  { name: '/stop', description: 'Kill all running background processes' },
   { name: '/background', description: 'Run a prompt in the background' },
   { name: '/bg', description: 'Run a prompt in the background (alias)' },
   { name: '/btw', description: 'Ephemeral side question (no tools, not persisted)' },
-  { name: '/queue', description: 'Queue a prompt for the next turn' },
-  { name: '/resume', description: 'Resume a previously-named session' },
-  { name: '/config', description: 'Show current configuration' },
-  { name: '/provider', description: 'Show available providers' },
-  { name: '/prompt', description: 'View/set custom system prompt' },
-  { name: '/personality', description: 'Set a predefined personality' },
-  { name: '/verbose', description: 'Cycle tool progress display' },
-  { name: '/yolo', description: 'Toggle YOLO mode (skip approvals)' },
-  { name: '/reasoning', description: 'Manage reasoning effort and display' },
-  { name: '/tools', description: 'Manage tools: list/disable/enable' },
-  { name: '/toolsets', description: 'List available toolsets' },
-  { name: '/skills', description: 'Search, install, inspect, or manage skills' },
-  { name: '/reload-mcp', description: 'Reload MCP servers from config' },
-  { name: '/browser', description: 'Connect browser tools via CDP' },
   { name: '/help', description: 'Show available commands' },
-  { name: '/usage', description: 'Show token usage for the current session' },
-  { name: '/insights', description: 'Show usage insights and analytics' },
-  { name: '/profile', description: 'Show active profile name and directory' },
-  { name: '/approve', description: 'Approve a pending dangerous command' },
-  { name: '/deny', description: 'Deny a pending dangerous command' },
-  { name: '/status', description: 'Show session info' },
-  { name: '/cron', description: 'Manage scheduled tasks' },
-  { name: '/voice', description: 'Toggle voice mode' },
-  { name: '/plugins', description: 'List installed plugins' },
-  { name: '/skin', description: 'Show or change the display skin/theme' },
 ];
 
 export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange }: ComposerProps) {
@@ -81,16 +64,47 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
   const [mentionFilter, setMentionFilter] = useState('');
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([]);
+  const [slashCommands, setSlashCommands] = useState<SlashCommandOption[]>(FALLBACK_SLASH_COMMANDS);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    apiClient.get<CommandsResponse>('/commands')
+      .then((res) => {
+        if (!res.ok || cancelled) return;
+        const next = res.commands.flatMap((command) => {
+          const names = command.names && command.names.length > 0
+            ? command.names
+            : [command.name, ...(command.aliases ?? [])];
+          return names.map((entryName) => ({
+            name: `/${entryName}`,
+            description: command.description,
+          }));
+        });
+
+        if (next.length > 0) {
+          const deduped = next.filter((entry, index, arr) => arr.findIndex((other) => other.name === entry.name) === index);
+          setSlashCommands(deduped);
+        }
+      })
+      .catch(() => {
+        // Fallback list remains in place.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Filtered commands for the slash menu
   const filteredCommands = slashFilter
-    ? SLASH_COMMANDS.filter(c => c.name.startsWith('/' + slashFilter))
-    : SLASH_COMMANDS;
+    ? slashCommands.filter(c => c.name.startsWith('/' + slashFilter))
+    : slashCommands;
 
   const filteredMentions = mentionFilter
     ? workspaceFiles.filter(f => f.toLowerCase().includes(mentionFilter.toLowerCase())).slice(0, 50)
@@ -136,21 +150,62 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
     fileInputRef.current?.click();
   };
 
-  const handleFilesChanged = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    const newAttachments: AttachedFile[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+  const appendFiles = (filesLike: FileList | File[]) => {
+    const files = Array.from(filesLike);
+    if (files.length === 0) return;
+    const newAttachments: AttachedFile[] = files.map((file) => {
       const type = file.type.startsWith('image/') ? 'image'
         : file.type.startsWith('audio/') ? 'audio'
         : 'other';
       const previewUrl = type === 'image' ? URL.createObjectURL(file) : '';
-      newAttachments.push({ file, previewUrl, type });
-    }
+      return { file, previewUrl, type };
+    });
     setAttachments((prev) => [...prev, ...newAttachments]);
+  };
+
+  const handleFilesChanged = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    appendFiles(files);
     e.target.value = ''; // Reset input
   };
+
+  const pasteClipboardImage = async () => {
+    if (!navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+      return false;
+    }
+    try {
+      const items = await navigator.clipboard.read();
+      const pastedFiles: File[] = [];
+      for (const item of items) {
+        const imageType = item.types.find((type) => type.startsWith('image/'));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        pastedFiles.push(new File([blob], `clipboard-${Date.now()}.${imageType.split('/')[1] || 'png'}`, { type: imageType }));
+      }
+      if (pastedFiles.length === 0) return false;
+      appendFiles(pastedFiles);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    const handleOpenFilePicker = () => {
+      handleFileSelect();
+    };
+    const handlePasteClipboard = async () => {
+      const success = await pasteClipboardImage();
+      window.dispatchEvent(new CustomEvent('hermes:composerPasteResult', { detail: { success } }));
+    };
+    window.addEventListener('hermes:composerOpenFilePicker', handleOpenFilePicker);
+    window.addEventListener('hermes:composerPasteClipboard', handlePasteClipboard);
+    return () => {
+      window.removeEventListener('hermes:composerOpenFilePicker', handleOpenFilePicker);
+      window.removeEventListener('hermes:composerPasteClipboard', handlePasteClipboard);
+    };
+  }, []);
 
   const removeAttachment = (index: number) => {
     setAttachments((prev) => {

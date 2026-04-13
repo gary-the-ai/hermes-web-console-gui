@@ -7,6 +7,7 @@ from aiohttp import web
 from .approvals import register_approval_api_routes
 from .browser import register_browser_api_routes
 from .chat import register_chat_api_routes
+from .commands import register_commands_api_routes
 from .cron import register_cron_api_routes
 from .gateway_admin import register_gateway_admin_api_routes
 from .logs import register_logs_api_routes
@@ -34,6 +35,7 @@ def register_web_console_api_routes(app: web.Application) -> None:
     register_approval_api_routes(app)
     register_browser_api_routes(app)
     register_chat_api_routes(app)
+    register_commands_api_routes(app)
     register_cron_api_routes(app)
     register_gateway_admin_api_routes(app)
     register_logs_api_routes(app)
@@ -60,6 +62,7 @@ __all__ = [
     "register_web_console_api_routes",
     "register_chat_api_routes",
     "register_browser_api_routes",
+    "register_commands_api_routes",
     "register_cron_api_routes",
     "register_gateway_admin_api_routes",
     "register_logs_api_routes",

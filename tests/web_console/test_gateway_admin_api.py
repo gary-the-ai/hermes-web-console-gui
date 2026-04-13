@@ -77,6 +77,24 @@ class FakeGatewayService:
         return platform == "discord" and user_id == "u-2"
 
 
+class FakeRunner:
+    def __init__(self) -> None:
+        self.restart_calls: list[tuple[bool, bool]] = []
+
+    def request_restart(self, *, detached: bool = False, via_service: bool = False) -> bool:
+        self.restart_calls.append((detached, via_service))
+        return True
+
+
+class RestartCapableAdapter:
+    class _Handler:
+        def __init__(self, runner: FakeRunner) -> None:
+            self.__self__ = runner
+
+    def __init__(self, runner: FakeRunner) -> None:
+        self._message_handler = self._Handler(runner)
+
+
 class TestGatewayAdminApiRoutes:
     @staticmethod
     async def _make_client(service: FakeGatewayService) -> TestClient:
@@ -183,5 +201,24 @@ class TestGatewayAdminApiRoutes:
             assert revoke_missing_resp.status == 404
             revoke_missing_payload = await revoke_missing_resp.json()
             assert revoke_missing_payload["error"]["code"] == "paired_user_not_found"
+        finally:
+            await client.close()
+
+    @pytest.mark.asyncio
+    async def test_restart_route_requests_gateway_restart_when_runner_is_available(self):
+        service = FakeGatewayService()
+        runner = FakeRunner()
+        app = web.Application()
+        app[GATEWAY_SERVICE_APP_KEY] = service
+        register_web_console_routes(app, adapter=RestartCapableAdapter(runner))
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            resp = await client.post("/api/gui/gateway/restart", json={})
+            assert resp.status == 200
+            payload = await resp.json()
+            assert payload["ok"] is True
+            assert payload["accepted"] is True
+            assert runner.restart_calls == [(True, False)]
         finally:
             await client.close()

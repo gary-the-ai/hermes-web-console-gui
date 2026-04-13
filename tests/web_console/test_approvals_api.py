@@ -13,6 +13,7 @@ import time
 from gateway.web_console.api.approvals import HUMAN_SERVICE_APP_KEY
 from gateway.web_console.routes import register_web_console_routes
 from gateway.web_console.services.approval_service import ApprovalService
+from tools.approval import disable_session_yolo
 
 
 def _wait_for_pending(service: ApprovalService, kind: str, timeout: float = 1.0):
@@ -162,3 +163,29 @@ class TestApprovalApiRoutes:
             await client.close()
 
         assert result["value"] == "deny"
+
+    @pytest.mark.asyncio
+    async def test_yolo_routes_toggle_session_state(self):
+        service = ApprovalService()
+        client = await self._make_client(service)
+        session_id = "sess-yolo"
+        disable_session_yolo(session_id)
+
+        try:
+            status_resp = await client.get(f"/api/gui/human/yolo?session_id={session_id}")
+            assert status_resp.status == 200
+            status_payload = await status_resp.json()
+            assert status_payload == {"ok": True, "session_id": session_id, "enabled": False}
+
+            enable_resp = await client.post("/api/gui/human/yolo", json={"session_id": session_id, "enabled": True})
+            assert enable_resp.status == 200
+            enable_payload = await enable_resp.json()
+            assert enable_payload == {"ok": True, "session_id": session_id, "enabled": True}
+
+            disable_resp = await client.post("/api/gui/human/yolo", json={"session_id": session_id, "enabled": False})
+            assert disable_resp.status == 200
+            disable_payload = await disable_resp.json()
+            assert disable_payload == {"ok": True, "session_id": session_id, "enabled": False}
+        finally:
+            disable_session_yolo(session_id)
+            await client.close()

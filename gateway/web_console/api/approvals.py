@@ -88,6 +88,37 @@ async def handle_clarify(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "request": resolved})
 
 
+async def handle_get_yolo(request: web.Request) -> web.Response:
+    from tools.approval import is_session_yolo_enabled
+
+    session_id = request.query.get("session_id", "")
+    if not session_id:
+        return _json_error(status=400, code="invalid_session_id", message="The 'session_id' query parameter is required.")
+    return web.json_response({"ok": True, "session_id": session_id, "enabled": is_session_yolo_enabled(session_id)})
+
+
+async def handle_set_yolo(request: web.Request) -> web.Response:
+    from tools.approval import disable_session_yolo, enable_session_yolo, is_session_yolo_enabled
+
+    data = await _read_json_body(request)
+    if data is None:
+        return _json_error(status=400, code="invalid_json", message="Request body must be a valid JSON object.")
+
+    session_id = data.get("session_id")
+    enabled = data.get("enabled")
+    if not isinstance(session_id, str) or not session_id:
+        return _json_error(status=400, code="invalid_session_id", message="The 'session_id' field must be a non-empty string.")
+    if not isinstance(enabled, bool):
+        return _json_error(status=400, code="invalid_enabled", message="The 'enabled' field must be a boolean.")
+
+    if enabled:
+        enable_session_yolo(session_id)
+    else:
+        disable_session_yolo(session_id)
+
+    return web.json_response({"ok": True, "session_id": session_id, "enabled": is_session_yolo_enabled(session_id)})
+
+
 def register_approval_api_routes(app: web.Application) -> None:
     if app.get(HUMAN_SERVICE_APP_KEY) is None:
         app[HUMAN_SERVICE_APP_KEY] = ApprovalService()
@@ -102,3 +133,5 @@ def register_approval_api_routes(app: web.Application) -> None:
     app.router.add_post("/api/gui/human/approve", handle_approve)
     app.router.add_post("/api/gui/human/deny", handle_deny)
     app.router.add_post("/api/gui/human/clarify", handle_clarify)
+    app.router.add_get("/api/gui/human/yolo", handle_get_yolo)
+    app.router.add_post("/api/gui/human/yolo", handle_set_yolo)

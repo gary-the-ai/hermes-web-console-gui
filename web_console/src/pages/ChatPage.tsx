@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiClient } from '../lib/api';
+import { getBackendUrl } from '../store/backendStore';
 import { openSessionEventStream, type GuiEvent } from '../lib/events';
 import { ApprovalPrompt } from '../components/chat/ApprovalPrompt';
 import { ClarifyPrompt } from '../components/chat/ClarifyPrompt';
@@ -12,9 +13,12 @@ import { SessionSidebar } from '../components/chat/SessionSidebar';
 
 interface HumanRequest {
   id: string;
+  request_id?: string;
   kind: 'approval' | 'clarify';
   command?: string;
   message?: string;
+  prompt?: string;
+  title?: string;
   expires_at?: number;
 }
 
@@ -28,6 +32,85 @@ interface ChatSendResponse {
   session_id: string;
   run_id: string;
   status: string;
+}
+
+interface CommandRegistryEntry {
+  name: string;
+  description: string;
+  category: string;
+  aliases?: string[];
+}
+
+interface CommandsResponse {
+  ok: boolean;
+  commands: CommandRegistryEntry[];
+}
+
+interface SettingsResponse {
+  ok: boolean;
+  settings?: Record<string, any>;
+}
+
+interface YoloResponse {
+  ok: boolean;
+  session_id: string;
+  enabled: boolean;
+}
+
+interface SessionsListResponse {
+  ok: boolean;
+  sessions: Array<{ session_id: string; title?: string | null; source?: string }>;
+}
+
+interface SessionSearchResponse {
+  ok: boolean;
+  search?: {
+    results?: Array<{ session_id: string; snippet?: string; session_title?: string }>;
+  };
+}
+
+interface TranscriptResponse {
+  ok: boolean;
+  items: Array<{ type?: string; role?: string; content?: string }>;
+}
+
+interface GatewayPlatformsResponse {
+  ok: boolean;
+  platforms: Array<{
+    key: string;
+    label: string;
+    enabled?: boolean;
+    configured?: boolean;
+    runtime_state?: string;
+    error_message?: string | null;
+  }>;
+}
+
+interface GatewayOverviewResponse {
+  ok: boolean;
+  overview?: {
+    summary?: {
+      platform_count?: number;
+      enabled_platforms?: number;
+      connected_platforms?: number;
+      pending_pairings?: number;
+      approved_pairings?: number;
+    };
+  };
+}
+
+interface UpdateCheckResponse {
+  ok: boolean;
+  current_version: string;
+  latest_version: string;
+  has_update: boolean;
+  project_url: string;
+}
+
+interface GatewayRestartResponse {
+  ok: boolean;
+  accepted?: boolean;
+  message?: string;
 }
 
 const DEFAULT_ITEMS: TranscriptItem[] = [];
@@ -73,9 +156,57 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
   const [usageData, setUsageData] = useState<Record<string, any>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [reasoningEffort, setReasoningEffort] = useState<string>('none');
+  const [showReasoning, setShowReasoning] = useState(false);
+  const [toolProgressMode, setToolProgressMode] = useState<'off' | 'new' | 'all' | 'verbose'>('all');
+  const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
   const subscriptionRef = useRef<{ close(): void } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const voiceModeRef = useRef(voiceMode);
+  const seenToolsRef = useRef<Set<string>>(new Set());
+  const queuedPromptRef = useRef<string | null>(null);
+
+  const resetChat = () => {
+    if (subscriptionRef.current) subscriptionRef.current.close();
+    window.location.hash = '#/chat';
+    setSessionId('current');
+    setItems([{ role: 'system', title: 'System', content: '✓ Ready. Send a message to start a new chat.' }]);
+    setRunStatus('ready');
+    setCurrentRunId(null);
+    setToolEvents([]);
+    setUsageData({});
+    setQueuedPromptState(null);
+  };
+
+  const addSystemMessage = (content: string, title = 'System') => {
+    setItems((prev) => [...prev, { role: 'system', title, content }]);
+  };
+
+  const setQueuedPromptState = (value: string | null) => {
+    queuedPromptRef.current = value;
+    setQueuedPrompt(value);
+  };
+
+  const dispatchUiRoute = (route: 'chat' | 'sessions' | 'workspace' | 'usage' | 'jobs' | 'skills' | 'memory' | 'missions') => {
+    window.dispatchEvent(new CustomEvent('hermes:navigate', { detail: { route } }));
+    window.location.hash = `#/${route}`;
+  };
+
+  const dispatchUiModal = (tab: 'settings' | 'tools' | 'gateway' | 'skills' | 'automations' | 'insights') => {
+    window.dispatchEvent(new CustomEvent('hermes:openModal', { detail: { tab } }));
+  };
+
+  const dispatchUiDrawer = (tab: 'terminal' | 'processes' | 'logs' | 'browser') => {
+    window.dispatchEvent(new CustomEvent('hermes:openDrawer', { detail: { tab } }));
+  };
+
+  const shouldDisplayToolEvent = (toolName: string) => {
+    if (toolProgressMode === 'off') return false;
+    if (toolProgressMode === 'new') {
+      if (seenToolsRef.current.has(toolName)) return false;
+      seenToolsRef.current.add(toolName);
+    }
+    return true;
+  };
 
   // Sync voiceMode prop to ref for event callbacks
   useEffect(() => {
@@ -84,6 +215,20 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
       window.speechSynthesis.cancel();
     }
   }, [voiceMode]);
+
+  useEffect(() => {
+    apiClient.get<SettingsResponse>('/settings')
+      .then((res) => {
+        if (!res.ok || !res.settings) return;
+        setReasoningEffort(String(res.settings.agent?.reasoning_effort ?? 'none'));
+        setShowReasoning(Boolean(res.settings.display?.show_reasoning ?? false));
+        const mode = String(res.settings.display?.tool_progress ?? 'all');
+        if (mode === 'off' || mode === 'new' || mode === 'all' || mode === 'verbose') {
+          setToolProgressMode(mode);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Sync state with Inspector Panels
   useEffect(() => {
@@ -105,15 +250,25 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
       subscriptionRef.current.close();
     }
 
-    setToolEvents(['run.started', 'message.user', 'tool.started', 'tool.completed', 'message.assistant.completed']);
+    seenToolsRef.current = new Set();
+    setToolEvents([]);
 
     subscriptionRef.current = openSessionEventStream(sid, (event) => {
-      const mapped = mapGuiEventToTranscriptItem(event);
+      let mapped: TranscriptItem | null = null;
+      if (event.type === 'tool.started' || event.type === 'tool.completed') {
+        const toolName = String(event.payload.tool_name ?? 'tool');
+        if (shouldDisplayToolEvent(toolName)) {
+          mapped = mapGuiEventToTranscriptItem(event);
+        }
+      } else {
+        mapped = mapGuiEventToTranscriptItem(event);
+      }
       if (mapped) {
         setItems((prev) => [...prev, mapped]);
       }
 
       if (event.type === 'message.reasoning.delta') {
+        if (!showReasoning) return;
         const text = String(event.payload.content || '');
         if (text) {
           setItems((prev) => {
@@ -168,7 +323,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
         }
       } else if (event.type === 'message.assistant.completed') {
         const text = String(event.payload.content || '');
-        const reasoning = event.payload.reasoning ? String(event.payload.reasoning) : undefined;
+        const reasoning = showReasoning && event.payload.reasoning ? String(event.payload.reasoning) : undefined;
         setItems((prev) => {
           const next = [...prev];
           const thinkingIdx = next.findIndex(i => i.content === '⏳ Hermes is thinking…');
@@ -191,7 +346,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
               isStreaming: false,
               isReasoningStreaming: false,
               // Prefer streamed reasoning, fall back to completed-payload reasoning
-              reasoning: next[lastAssistantIdx].reasoning || reasoning,
+              reasoning: showReasoning ? (next[lastAssistantIdx].reasoning || reasoning) : undefined,
             };
           } else {
             next.push({ role: 'assistant', title: 'Hermes', content: text || '(no response text)', isStreaming: false, reasoning });
@@ -209,16 +364,28 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
 
       if (event.type === 'tool.started') {
         const name = String(event.payload.tool_name ?? 'tool');
-        setToolEvents((prev) => {
-          const entry = `tool.started · ${name}`;
-          return prev.includes(entry) ? prev : [...prev, entry];
-        });
+        const preview = String(event.payload.preview ?? '');
+        if (toolProgressMode !== 'off') {
+          setToolEvents((prev) => {
+            const entry = toolProgressMode === 'verbose' && preview
+              ? `tool.started · ${name} · ${preview}`
+              : `tool.started · ${name}`;
+            if (toolProgressMode === 'all' || toolProgressMode === 'verbose') return [...prev, entry];
+            return prev.includes(entry) ? prev : [...prev, entry];
+          });
+        }
       } else if (event.type === 'tool.completed') {
         const name = String(event.payload.tool_name ?? 'tool');
-        setToolEvents((prev) => {
-          const entry = `tool.completed · ${name}`;
-          return prev.includes(entry) ? prev : [...prev, entry];
-        });
+        const preview = String(event.payload.result_preview ?? '');
+        if (toolProgressMode !== 'off') {
+          setToolEvents((prev) => {
+            const entry = toolProgressMode === 'verbose' && preview
+              ? `tool.completed · ${name} · ${preview}`
+              : `tool.completed · ${name}`;
+            if (toolProgressMode === 'all' || toolProgressMode === 'verbose') return [...prev, entry];
+            return prev.includes(entry) ? prev : [...prev, entry];
+          });
+        }
       } else if (event.type === 'run.completed') {
         setRunStatus('completed');
         if (event.payload.usage) {
@@ -248,6 +415,13 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
           }
           return prev;
         });
+        const pendingQueuedPrompt = queuedPromptRef.current;
+        if (pendingQueuedPrompt) {
+          setQueuedPromptState(null);
+          setTimeout(() => {
+            handleSend(pendingQueuedPrompt, [], false, false).catch(() => {});
+          }, 0);
+        }
       } else if (event.type === 'run.failed') {
         setRunStatus('failed');
         // Remove the "thinking" indicator on failure too
@@ -279,6 +453,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
     setCurrentRunId(null);
     setToolEvents([]);
     setUsageData({});
+    setQueuedPromptState(null);
     try {
       const res = await apiClient.get<any>(`/sessions/${sid}/transcript`);
       if (res.ok && Array.isArray(res.items)) {
@@ -307,7 +482,13 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
       .get<HumanPendingResponse>('/human/pending')
       .then((response) => {
         if (active && response.ok) {
-          setHumanPending(response.pending);
+          const normalized = response.pending.map((item: any) => ({
+            ...item,
+            id: String(item.id ?? item.request_id ?? ''),
+            command: item.command ?? item.metadata?.command ?? item.prompt,
+            message: item.message ?? item.prompt,
+          }));
+          setHumanPending(normalized);
         }
       })
       .catch(() => {});
@@ -371,7 +552,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
     if (sessionId && sessionId !== 'current') {
       subscribeToEvents(sessionId);
     }
-  }, [sessionId]);
+  }, [sessionId, showReasoning, toolProgressMode]);
 
   const approvals = humanPending.filter((item) => item.kind === 'approval');
   const clarifications = humanPending.filter((item) => item.kind === 'clarify');
@@ -405,7 +586,607 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
     }
   };
 
+  const handleSlashCommand = async (rawPrompt: string): Promise<boolean> => {
+    const trimmed = rawPrompt.trim();
+    if (!trimmed.startsWith('/')) return false;
+
+    const [rawName, ...rest] = trimmed.slice(1).split(/\s+/);
+    const command = rawName.toLowerCase();
+    const args = rest.join(' ').trim();
+
+    if (command === 'btw' || command === 'bg' || command === 'background') {
+      return false;
+    }
+
+    if (command === 'new' || command === 'reset' || command === 'clear') {
+      resetChat();
+      return true;
+    }
+
+    if (command === 'help' || command === 'commands') {
+      dispatchUiRoute('commands');
+      try {
+        const res = await apiClient.get<CommandsResponse>('/commands');
+        if (res.ok) {
+          const preview = res.commands
+            .slice(0, 12)
+            .map((entry) => `/${entry.name}${entry.aliases && entry.aliases.length ? ` (${entry.aliases.map((alias) => `/${alias}`).join(', ')})` : ''} — ${entry.description}`)
+            .join('\n');
+          addSystemMessage(`Opened Command Browser.\n\nAvailable commands: ${res.commands.length}\n\n${preview}`, 'Commands');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Failed to load command help: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'queue') {
+      if (!args) {
+        addSystemMessage('Usage: /queue <prompt>', 'Queue');
+        return true;
+      }
+      if (runStatus === 'running') {
+        setQueuedPromptState(args);
+        addSystemMessage(`Queued for next turn: ${args}`, 'Queue');
+      } else {
+        addSystemMessage('No active run — sending queued prompt immediately.', 'Queue');
+        setTimeout(() => {
+          handleSend(args, [], false, false).catch(() => {});
+        }, 0);
+      }
+      return true;
+    }
+
+    if (command === 'history') {
+      if (sessionId === 'current') {
+        addSystemMessage('No active session yet. Send a message first, or open Sessions to browse saved chats.', 'History');
+        dispatchUiRoute('sessions');
+        return true;
+      }
+      try {
+        const transcript = await apiClient.get<TranscriptResponse>(`/sessions/${sessionId}/transcript`);
+        const lines = (transcript.items || [])
+          .slice(-12)
+          .map((item) => {
+            const role = String(item.role || item.type || 'message');
+            const content = String(item.content || '').replace(/\s+/g, ' ').trim();
+            return `${role}: ${content}`;
+          })
+          .filter(Boolean);
+
+        if (lines.length === 0) {
+          addSystemMessage(`Session ${sessionId} has no transcript entries yet.`, 'History');
+        } else {
+          addSystemMessage(`Recent history for ${sessionId}:\n\n${lines.join('\n')}`, 'History');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Failed to load history: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'config') {
+      try {
+        const current = await apiClient.get<SettingsResponse>('/settings');
+        const settings = current.settings || {};
+        const summary = {
+          model: settings.model,
+          provider: settings.provider,
+          agent: {
+            reasoning_effort: settings.agent?.reasoning_effort,
+            service_tier: settings.agent?.service_tier,
+            verbose: settings.agent?.verbose,
+            max_turns: settings.agent?.max_turns,
+          },
+          display: {
+            show_reasoning: settings.display?.show_reasoning,
+            tool_progress: settings.display?.tool_progress,
+            streaming: settings.display?.streaming,
+            skin: settings.display?.skin,
+          },
+          approvals: settings.approvals,
+          terminal: settings.terminal,
+          browser: settings.browser,
+          timezone: settings.timezone,
+        };
+        addSystemMessage(`Effective config snapshot:\n\n${JSON.stringify(summary, null, 2)}`, 'Config');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Failed to load config: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'save') {
+      if (sessionId === 'current') {
+        addSystemMessage('Nothing to save yet. Start a chat first so Hermes has a session transcript to export.', 'Save');
+        return true;
+      }
+      const backend = getBackendUrl();
+      const exportUrl = `${backend ? `${backend}/api/gui` : '/api/gui'}/sessions/${encodeURIComponent(sessionId)}/export?format=json`;
+      window.open(exportUrl, '_blank', 'noopener,noreferrer');
+      addSystemMessage(`Export started for session ${sessionId}.`, 'Save');
+      return true;
+    }
+
+    if (command === 'platforms' || command === 'gateway') {
+      try {
+        const [platformsRes, overviewRes] = await Promise.all([
+          apiClient.get<GatewayPlatformsResponse>('/gateway/platforms'),
+          apiClient.get<GatewayOverviewResponse>('/gateway/overview').catch(() => ({ ok: false } as GatewayOverviewResponse)),
+        ]);
+        const summary = overviewRes.overview?.summary;
+        const lines = platformsRes.platforms.map((platform) => {
+          const state = platform.runtime_state || (platform.enabled ? 'enabled' : 'disabled');
+          const detail = platform.error_message || (platform.configured ? 'configured' : 'not configured');
+          return `${platform.label} (${platform.key}) — ${state}; ${detail}`;
+        });
+        const header = summary
+          ? `Platforms: total=${summary.platform_count ?? 0}, enabled=${summary.enabled_platforms ?? 0}, connected=${summary.connected_platforms ?? 0}, pending_pairings=${summary.pending_pairings ?? 0}`
+          : 'Gateway platforms:';
+        addSystemMessage(`${header}\n\n${lines.join('\n')}`, 'Platforms');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Failed to load platform status: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'sethome' || command === 'set-home') {
+      if (!args) {
+        dispatchUiModal('gateway');
+        addSystemMessage(
+          'Usage: /sethome <platform> <chat_id>\n\nExample: /sethome discord 1234567890\nThis sets the platform home channel using the existing gateway config surface.',
+          'Set Home',
+        );
+        return true;
+      }
+
+      const [platform, ...chatIdParts] = args.split(/\s+/).filter(Boolean);
+      const chatId = chatIdParts.join(' ').trim();
+      if (!platform || !chatId) {
+        addSystemMessage('Usage: /sethome <platform> <chat_id>', 'Set Home');
+        return true;
+      }
+
+      try {
+        const res = await apiClient.patch<any>(`/gateway/platforms/${encodeURIComponent(platform)}/config`, { home_channel: chatId });
+        if (res?.ok) {
+          addSystemMessage(
+            `✅ Home channel for ${platform} set to ${chatId}.${res.reload_required ? ' Restart Hermes for changes to fully apply.' : ''}`,
+            'Set Home',
+          );
+        } else {
+          addSystemMessage(`Failed to set home channel for ${platform}.`, 'Error');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Set home failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'restart') {
+      try {
+        const res = await apiClient.post<GatewayRestartResponse>('/gateway/restart', {});
+        if (res.ok && res.accepted) {
+          addSystemMessage(res.message || 'Gateway restart requested. Active runs will drain before restart.', 'Restart');
+        } else {
+          addSystemMessage(res.message || 'Gateway restart was not accepted because one is already in progress.', 'Restart');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Restart failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'update') {
+      try {
+        const res = await apiClient.get<UpdateCheckResponse>('/version/check');
+        if (!res.ok) {
+          addSystemMessage('Update check failed.', 'Update');
+          return true;
+        }
+        if (res.has_update) {
+          window.open(res.project_url, '_blank', 'noopener,noreferrer');
+          addSystemMessage(`Update available: ${res.current_version} → ${res.latest_version}. Opened project page for upgrade instructions.`, 'Update');
+        } else {
+          addSystemMessage(`Hermes is up to date (${res.current_version}).`, 'Update');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Update check failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'image') {
+      window.dispatchEvent(new CustomEvent('hermes:composerOpenFilePicker'));
+      addSystemMessage('Opened the file picker. Choose an image to attach to your next prompt.', 'Image');
+      return true;
+    }
+
+    if (command === 'paste') {
+      const pasteResult = await new Promise<boolean>((resolve) => {
+        const timeout = window.setTimeout(() => {
+          window.removeEventListener('hermes:composerPasteResult', handlePasteResult as EventListener);
+          resolve(false);
+        }, 3000);
+
+        const handlePasteResult = (event: Event) => {
+          window.clearTimeout(timeout);
+          window.removeEventListener('hermes:composerPasteResult', handlePasteResult as EventListener);
+          const customEvent = event as CustomEvent<{ success?: boolean }>;
+          resolve(Boolean(customEvent.detail?.success));
+        };
+
+        window.addEventListener('hermes:composerPasteResult', handlePasteResult as EventListener, { once: true });
+        window.dispatchEvent(new CustomEvent('hermes:composerPasteClipboard'));
+      });
+
+      addSystemMessage(
+        pasteResult
+          ? 'Pasted image from clipboard into composer attachments.'
+          : 'No image found in clipboard, or clipboard access was denied.',
+        'Paste',
+      );
+      return true;
+    }
+
+    if (command === 'resume') {
+      if (!args) {
+        dispatchUiRoute('sessions');
+        addSystemMessage('Opened Sessions. Use the session list to resume a previous chat, or run /resume <session id or title>.', 'Resume');
+        return true;
+      }
+      try {
+        const [sessionsRes, searchRes] = await Promise.all([
+          apiClient.get<SessionsListResponse>('/sessions').catch(() => ({ ok: false, sessions: [] } as SessionsListResponse)),
+          apiClient.get<SessionSearchResponse>(`/session-search?q=${encodeURIComponent(args)}`).catch(() => ({ ok: false } as SessionSearchResponse)),
+        ]);
+
+        const normalizedArgs = args.trim().toLowerCase();
+        const exactSession = (sessionsRes.sessions || []).find((session) =>
+          session.session_id.toLowerCase() === normalizedArgs || String(session.title || '').trim().toLowerCase() === normalizedArgs,
+        );
+        const fuzzySessionId = exactSession?.session_id || searchRes.search?.results?.[0]?.session_id;
+
+        if (!fuzzySessionId) {
+          addSystemMessage(`No session matched "${args}". Opened Sessions so you can choose manually.`, 'Resume');
+          dispatchUiRoute('sessions');
+          return true;
+        }
+
+        await apiClient.post(`/sessions/${fuzzySessionId}/resume`, {});
+        await loadSession(fuzzySessionId);
+        addSystemMessage(`↻ Resumed session ${fuzzySessionId}.`, 'Resume');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Resume failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'branch') {
+      if (sessionId === 'current') {
+        addSystemMessage('No active saved session to branch yet. Send a message first, then try /branch again.', 'Branch');
+        return true;
+      }
+      try {
+        const res = await apiClient.post<{ ok: boolean; session_id: string; title: string; message_count: number }>(`/sessions/${sessionId}/branch`, {});
+        if (res.ok && args) {
+          await apiClient.post(`/sessions/${res.session_id}/title`, { title: args });
+        }
+        const branchTitle = args || res.title;
+        addSystemMessage(`🌿 Branched session created: ${branchTitle} (${res.message_count} messages). Loading…`, 'Branch');
+        setTimeout(() => loadSession(res.session_id), 300);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Branch failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'approve') {
+      const pendingApproval = humanPending.find((item) => item.kind === 'approval');
+      if (!pendingApproval) {
+        addSystemMessage('There is no pending approval request right now.', 'Approve');
+        return true;
+      }
+      const decision = args === 'session' || args === 'always' ? args : 'once';
+      try {
+        await handleApprove(pendingApproval.id, decision);
+        addSystemMessage(`Approved pending request (${decision}).`, 'Approve');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Approve failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'deny') {
+      const pendingRequest = humanPending[0];
+      if (!pendingRequest) {
+        addSystemMessage('There is no pending approval or clarification request right now.', 'Deny');
+        return true;
+      }
+      try {
+        await handleDeny(pendingRequest.id);
+        addSystemMessage(`Denied pending ${pendingRequest.kind} request.`, 'Deny');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Deny failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'usage') {
+      dispatchUiRoute('usage');
+      addSystemMessage('Opened Usage.', 'Navigation');
+      return true;
+    }
+
+    if (command === 'skills') {
+      dispatchUiRoute('skills');
+      addSystemMessage('Opened Skills.', 'Navigation');
+      return true;
+    }
+
+    if (command === 'tools' || command === 'toolsets') {
+      dispatchUiModal('tools');
+      addSystemMessage('Opened Tools & Toolsets in Control Center.', 'Navigation');
+      return true;
+    }
+
+    if (command === 'platforms' || command === 'gateway') {
+      dispatchUiModal('gateway');
+      addSystemMessage('Opened Messaging Gateway controls.', 'Navigation');
+      return true;
+    }
+
+    if (command === 'cron') {
+      dispatchUiModal('automations');
+      addSystemMessage('Opened Automations (Cron).', 'Navigation');
+      return true;
+    }
+
+    if (command === 'insights') {
+      dispatchUiModal('insights');
+      addSystemMessage('Opened Analytics & Insights.', 'Navigation');
+      return true;
+    }
+
+    if (command === 'browser') {
+      dispatchUiDrawer('browser');
+      addSystemMessage('Opened Browser controls in the bottom drawer.', 'Navigation');
+      return true;
+    }
+
+    if (command === 'voice') {
+      window.dispatchEvent(new CustomEvent('hermes:toggleVoiceMode'));
+      addSystemMessage(`Voice mode ${voiceModeRef.current ? 'toggle requested off' : 'toggle requested on'}.`, 'Voice');
+      return true;
+    }
+
+    if (command === 'fast') {
+      try {
+        const current = await apiClient.get<SettingsResponse>('/settings');
+        const currentMode = String(current.settings?.agent?.service_tier ?? 'normal').toLowerCase();
+
+        if (!args || args === 'status') {
+          addSystemMessage(`Fast mode: ${currentMode === 'fast' ? 'fast' : 'normal'}`, 'Fast Mode');
+          return true;
+        }
+
+        if (['fast', 'on'].includes(args)) {
+          await apiClient.patch('/settings', { agent: { service_tier: 'fast' } });
+          addSystemMessage('⚡ Fast mode enabled. It will apply on the next message.', 'Fast Mode');
+          return true;
+        }
+
+        if (['normal', 'off'].includes(args)) {
+          await apiClient.patch('/settings', { agent: { service_tier: 'normal' } });
+          addSystemMessage('⚡ Fast mode disabled. Normal mode will apply on the next message.', 'Fast Mode');
+          return true;
+        }
+
+        addSystemMessage('Usage: /fast [normal|fast|status]', 'Fast Mode');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Fast mode update failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'yolo') {
+      const activeSessionId = sessionId === 'current' ? '' : sessionId;
+      if (!activeSessionId) {
+        addSystemMessage('YOLO mode is session-scoped. Start or open a session first, then try /yolo again.');
+        return true;
+      }
+      try {
+        const current = await apiClient.get<YoloResponse>(`/human/yolo?session_id=${encodeURIComponent(activeSessionId)}`);
+        const nextEnabled = args === 'on' ? true : args === 'off' ? false : !current.enabled;
+        const updated = await apiClient.post<YoloResponse>('/human/yolo', { session_id: activeSessionId, enabled: nextEnabled });
+        addSystemMessage(
+          updated.enabled
+            ? '⚡ YOLO mode ON for this session — dangerous commands will auto-approve.'
+            : '⚠️ YOLO mode OFF for this session — dangerous commands will require approval.',
+          'YOLO',
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`YOLO update failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (['model', 'provider', 'personality', 'skin', 'plugins', 'reload-mcp', 'config', 'profile'].includes(command)) {
+      dispatchUiModal('settings');
+      addSystemMessage(`Opened Settings for /${command}${args ? ` ${args}` : ''}.`, 'Navigation');
+      return true;
+    }
+
+    if (command === 'reasoning') {
+      try {
+        if (!args || args === 'status') {
+          addSystemMessage(`Reasoning effort: ${reasoningEffort}\nReasoning display: ${showReasoning ? 'on' : 'off'}`, 'Reasoning');
+          return true;
+        }
+
+        if (['show', 'on'].includes(args)) {
+          await apiClient.patch('/settings', { display: { show_reasoning: true } });
+          setShowReasoning(true);
+          addSystemMessage('🧠 Reasoning display enabled.', 'Reasoning');
+          return true;
+        }
+
+        if (['hide', 'off'].includes(args)) {
+          await apiClient.patch('/settings', { display: { show_reasoning: false } });
+          setShowReasoning(false);
+          addSystemMessage('🧠 Reasoning display disabled.', 'Reasoning');
+          return true;
+        }
+
+        if (['none', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(args)) {
+          await apiClient.patch('/settings', { agent: { reasoning_effort: args } });
+          setReasoningEffort(args);
+          addSystemMessage(`🧠 Reasoning effort set to ${args}. It will apply on the next message.`, 'Reasoning');
+          return true;
+        }
+
+        addSystemMessage('Usage: /reasoning [none|minimal|low|medium|high|xhigh|show|hide|status]', 'Reasoning');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Reasoning update failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'verbose') {
+      try {
+        const cycle: Array<'off' | 'new' | 'all' | 'verbose'> = ['off', 'new', 'all', 'verbose'];
+        const currentIdx = cycle.indexOf(toolProgressMode);
+        const nextMode = currentIdx >= 0 ? cycle[(currentIdx + 1) % cycle.length] : 'all';
+        const selectedMode = (args === 'off' || args === 'new' || args === 'all' || args === 'verbose')
+          ? args
+          : args === 'status'
+            ? toolProgressMode
+            : nextMode;
+
+        if (args === 'status') {
+          addSystemMessage(`Tool progress mode: ${toolProgressMode}`, 'Verbose');
+          return true;
+        }
+
+        await apiClient.patch('/settings', { display: { tool_progress: selectedMode } });
+        if (selectedMode === 'off' || selectedMode === 'new' || selectedMode === 'all' || selectedMode === 'verbose') {
+          setToolProgressMode(selectedMode);
+        }
+        addSystemMessage(`⚙️ Tool progress set to ${selectedMode}.`, 'Verbose');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Verbose update failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'status') {
+      addSystemMessage(
+        [
+          `Session: ${sessionId}`,
+          `Run status: ${runStatus}`,
+          `Run id: ${currentRunId ?? 'none'}`,
+          `Queued prompt: ${queuedPrompt ?? 'none'}`,
+          `Reasoning effort: ${reasoningEffort}`,
+          `Reasoning display: ${showReasoning ? 'on' : 'off'}`,
+          `Tool progress: ${toolProgressMode}`,
+          `Voice mode: ${voiceModeRef.current ? 'on' : 'off'}`,
+        ].join('\n'),
+        'Status',
+      );
+      return true;
+    }
+
+    if (command === 'retry' && currentRunId) {
+      try {
+        const res = await apiClient.post<ChatSendResponse>('/chat/retry', { run_id: currentRunId });
+        setCurrentRunId(res.run_id);
+        setRunStatus('running');
+        addSystemMessage('🔄 Retrying…');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Retry failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'undo') {
+      try {
+        const res = await apiClient.post<any>('/chat/undo', { session_id: sessionId, run_id: currentRunId });
+        if (res.supported) {
+          setItems((prev) => prev.slice(0, -1));
+        } else {
+          addSystemMessage('Undo is not yet supported for web runs. Use branching to fork from an earlier point.');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Undo failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'stop' && currentRunId) {
+      try {
+        const res = await apiClient.post<any>('/chat/stop', { run_id: currentRunId });
+        if (res.supported && res.stop_requested) {
+          setRunStatus('stopped');
+          addSystemMessage('⏹ Stop requested.');
+        } else {
+          addSystemMessage('Stop is not supported for this run. It will complete naturally.');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Stop failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'compress') {
+      if (sessionId === 'current') {
+        addSystemMessage('Compression needs an active saved session. Send a message first, then try again.');
+        return true;
+      }
+      try {
+        const payload: { session_id: string; focus_topic?: string } = { session_id: sessionId };
+        if (args) payload.focus_topic = args;
+        const res = await apiClient.post<{ok: boolean, compressed: boolean, reason?: string, original_length?: number, new_length?: number, focus_topic?: string}>('/chat/compress', payload);
+        if (res.compressed) {
+          await loadSession(sessionId);
+          addSystemMessage(`✓ Context compressed from ${res.original_length} to ${res.new_length} messages${res.focus_topic ? ` (focus: "${res.focus_topic}")` : ''}.`);
+        } else {
+          addSystemMessage(`Compression skipped: ${res.reason}`);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Compression failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    addSystemMessage(`/${command} is not wired up in the web command dispatcher yet. Use /help for available commands or the dedicated GUI surfaces.`, 'Command');
+    return true;
+  };
+
   const handleSend = async (prompt: string, attachments: AttachedFile[] = [], isBackground?: boolean, isQuickAsk?: boolean) => {
+    if (!attachments.length) {
+      const intercepted = await handleSlashCommand(prompt);
+      if (intercepted) return;
+    }
+
     setItems((prev) => [...prev, { role: 'user', title: isQuickAsk ? 'You (Quick Ask)' : 'You', content: prompt + (attachments.length ? ` [${attachments.length} file(s) attached]` : '') }]);
     setRunStatus('sending…');
 
@@ -495,16 +1276,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
         <SessionSidebar 
            activeSessionId={sessionId === 'current' ? null : sessionId}
            onSelectSession={loadSession}
-           onNewChat={() => {
-             if (subscriptionRef.current) subscriptionRef.current.close();
-             window.location.hash = '#/chat';
-             setSessionId('current');
-             setItems([{ role: 'system', title: 'System', content: '✓ Ready. Send a message to start a new chat.' }]);
-             setRunStatus('ready');
-             setCurrentRunId(null);
-             setToolEvents([]);
-             setUsageData({});
-           }}
+           onNewChat={resetChat}
         />
       )}
       <div className="chat-layout" style={{ flex: 1, position: 'relative' }}>
@@ -616,16 +1388,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
           )}
         </div>
 
-        <Composer onSend={handleSend} onNewChat={() => {
-          if (subscriptionRef.current) subscriptionRef.current.close();
-          window.location.hash = '#/chat';
-          setSessionId('current');
-          setItems([{ role: 'system', title: 'System', content: '✓ Ready. Send a message to start a new chat.' }]);
-          setRunStatus('ready');
-          setCurrentRunId(null);
-          setToolEvents([]);
-          setUsageData({});
-        }}
+        <Composer onSend={handleSend} onNewChat={resetChat}
         reasoningEffort={reasoningEffort}
         onReasoningChange={(val) => {
           setReasoningEffort(val);

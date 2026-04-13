@@ -34,6 +34,7 @@ function buildCategories(s: Record<string, any>): SettingCategory[] {
       fields: [
         { id: 'display.personality', label: 'Personality', type: 'select', value: String(s.display?.personality ?? 'kawaii'), options: ['helpful', 'concise', 'technical', 'creative', 'teacher', 'kawaii', 'catgirl', 'pirate', 'shakespeare', 'surfer', 'noir', 'uwu', 'philosopher', 'hype'] },
         { id: 'agent.reasoning_effort', label: 'Reasoning Effort', type: 'select', value: String(s.agent?.reasoning_effort ?? 'medium'), options: ['xhigh', 'high', 'medium', 'low', 'minimal', 'none'] },
+        { id: 'agent.service_tier', label: 'Fast Mode / Priority Processing', type: 'select', value: String(s.agent?.service_tier ?? 'normal'), options: ['normal', 'fast'] },
         { id: 'agent.verbose', label: 'Verbose Logging', type: 'boolean', value: Boolean(s.agent?.verbose ?? false) },
         { id: 'agent.max_turns', label: 'Max Iterations per Turn', type: 'number', value: Number(s.agent?.max_turns ?? 25) },
         { id: 'agent.tool_use_enforcement', label: 'Tool Use Enforcement', type: 'text', value: String(s.agent?.tool_use_enforcement ?? 'auto'), placeholder: 'auto, true, false, or substrings' },
@@ -91,6 +92,7 @@ function buildCategories(s: Record<string, any>): SettingCategory[] {
       label: 'Display & Privacy',
       fields: [
         { id: 'display.skin', label: 'CLI Theme Skin', type: 'select', value: String(s.display?.skin ?? 'default'), options: ['default', 'ares', 'mono', 'slate'] },
+        { id: 'display.tool_progress', label: 'Tool Progress Display', type: 'select', value: String(s.display?.tool_progress ?? 'all'), options: ['off', 'new', 'all', 'verbose'] },
         { id: 'display.streaming', label: 'Stream Tokens', type: 'boolean', value: Boolean(s.display?.streaming ?? false) },
         { id: 'display.show_reasoning', label: 'Show Reasoning', type: 'boolean', value: Boolean(s.display?.show_reasoning ?? false) },
         { id: 'display.show_cost', label: 'Show Cost', type: 'boolean', value: Boolean(s.display?.show_cost ?? false) },

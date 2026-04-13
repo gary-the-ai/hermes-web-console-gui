@@ -10,6 +10,7 @@ import { JobsPage } from '../../pages/JobsPage';
 import { SkillsPage } from '../../pages/SkillsPage';
 import { MemoryPage } from '../../pages/MemoryPage';
 import { MissionsPage } from '../../pages/MissionsPage';
+import { CommandsPage } from '../../pages/CommandsPage';
 import { initialUiState, setInspectorTab, setRoute, toggleDrawer, toggleInspector, toggleModal, toggleVoiceMode } from '../../store/uiStore';
 import { BottomDrawer } from './BottomDrawer';
 import { Inspector } from './Inspector';
@@ -33,6 +34,7 @@ function AllRoutes({ activeRoute, voiceMode }: { activeRoute: PrimaryRoute; voic
       <div style={hidden('skills')}><SkillsPage /></div>
       <div style={hidden('memory')}><MemoryPage /></div>
       <div style={hidden('missions')}><MissionsPage /></div>
+      <div style={hidden('commands')}><CommandsPage /></div>
     </>
   );
 }
@@ -58,7 +60,7 @@ export function AppShell() {
       const parts = hash.split('/');
       const nextRoute = parts[0] as PrimaryRoute;
       
-      if (['chat', 'sessions', 'workspace', 'usage', 'jobs', 'skills', 'memory', 'missions'].includes(nextRoute)) {
+      if (['chat', 'sessions', 'workspace', 'usage', 'jobs', 'skills', 'memory', 'missions', 'commands'].includes(nextRoute)) {
         if (uiState.route !== nextRoute) {
           setUiState(current => setRoute(current, nextRoute));
         }
@@ -83,8 +85,44 @@ export function AppShell() {
         artifactContent: customEvent.detail.content
       }));
     };
+
+    const handleNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ route?: PrimaryRoute }>;
+      const nextRoute = customEvent.detail?.route;
+      if (!nextRoute) return;
+      navigate(nextRoute);
+    };
+
+    const handleOpenModal = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tab?: ModalTab }>;
+      const tab = customEvent.detail?.tab;
+      if (!tab) return;
+      setUiState((current) => toggleModal(current, tab));
+    };
+
+    const handleOpenDrawer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tab?: DrawerTab }>;
+      const tab = customEvent.detail?.tab;
+      if (!tab) return;
+      setUiState((current) => toggleDrawer(current, tab));
+    };
+
+    const handleToggleVoice = () => {
+      setUiState((current) => toggleVoiceMode(current));
+    };
+
     window.addEventListener('hermes:openArtifact', handleOpenArtifact);
-    return () => window.removeEventListener('hermes:openArtifact', handleOpenArtifact);
+    window.addEventListener('hermes:navigate', handleNavigate);
+    window.addEventListener('hermes:openModal', handleOpenModal);
+    window.addEventListener('hermes:openDrawer', handleOpenDrawer);
+    window.addEventListener('hermes:toggleVoiceMode', handleToggleVoice);
+    return () => {
+      window.removeEventListener('hermes:openArtifact', handleOpenArtifact);
+      window.removeEventListener('hermes:navigate', handleNavigate);
+      window.removeEventListener('hermes:openModal', handleOpenModal);
+      window.removeEventListener('hermes:openDrawer', handleOpenDrawer);
+      window.removeEventListener('hermes:toggleVoiceMode', handleToggleVoice);
+    };
   }, []);
 
   // Sync hash to state changes

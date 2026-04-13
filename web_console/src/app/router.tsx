@@ -56,6 +56,13 @@ export const ROUTES: readonly RouteDefinition[] = [
     description: 'Kanban board for agent tasks.',
     headline: 'Missions Board',
     summary: 'Organize and track agent missions with drag-and-drop Kanban columns.'
+  },
+  {
+    id: 'commands',
+    label: 'Commands',
+    description: 'Browse shared Hermes slash commands and parity status.',
+    headline: 'Command Browser',
+    summary: 'See the canonical command registry, aliases, usage hints, and which commands are fully or partially supported in the web console.'
   }
 ] as const;
 

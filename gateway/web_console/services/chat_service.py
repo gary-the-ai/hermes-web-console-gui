@@ -153,6 +153,8 @@ class ChatService:
         def _run() -> dict[str, Any]:
             import importlib
             from gateway.run import _resolve_gateway_model, _resolve_runtime_agent_kwargs
+            from gateway.run import GatewayRunner
+            from hermes_cli.models import resolve_fast_mode_overrides
             from run_agent import AIAgent
 
             terminal_tool = importlib.import_module("tools.terminal_tool")
@@ -168,13 +170,18 @@ class ChatService:
 
             def _execute_with_agent() -> dict[str, Any]:
                 is_quick_ask = kwargs.get("quick_ask", False)
+                active_model = _resolve_gateway_model()
+                service_tier = GatewayRunner._load_service_tier()
+                request_overrides = resolve_fast_mode_overrides(active_model) if service_tier else None
                 agent = AIAgent(
-                    model=_resolve_gateway_model(),
+                    model=active_model,
                     **runtime_kwargs,
                     quiet_mode=True,
                     verbose_logging=False,
                     session_id=session_id,
                     platform="web_console",
+                    service_tier=service_tier,
+                    request_overrides=request_overrides,
                     ephemeral_system_prompt=ephemeral_system_prompt,
                     clarify_callback=clarify_callback,
                     gui_event_callback=gui_event_callback,

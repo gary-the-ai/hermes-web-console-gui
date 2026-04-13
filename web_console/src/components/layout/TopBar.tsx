@@ -57,7 +57,8 @@ const NAV_ICONS: Record<string, string> = {
   jobs: '⚡',
   skills: '✨',
   memory: '🧠',
-  missions: '🎯'
+  missions: '🎯',
+  commands: '⌘'
 };
 
 const QUICK_MODELS = [

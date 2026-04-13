@@ -138,6 +138,9 @@ describe('App shell', () => {
           { status: 200 }
         );
       }
+      if (url.includes('/api/gui/commands')) {
+        return new Response(JSON.stringify({ ok: true, commands: [] }), { status: 200 });
+      }
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }) as typeof fetch;
   });
