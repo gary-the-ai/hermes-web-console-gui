@@ -16,6 +16,7 @@ import { BottomDrawer } from './BottomDrawer';
 import { Inspector } from './Inspector';
 import { TopBar } from './TopBar';
 import { ControlCenterModal } from './ControlCenterModal';
+import { CommandPalette } from './CommandPalette';
 import { Toaster } from '../shared/Toaster';
 import { ArtifactViewer } from '../chat/ArtifactViewer';
 
@@ -41,6 +42,7 @@ function AllRoutes({ activeRoute, voiceMode }: { activeRoute: PrimaryRoute; voic
 
 export function AppShell() {
   const [uiState, setUiState] = useState(initialUiState);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const connection = useConnection();
   const route = useMemo(() => ROUTES.find((item) => item.id === uiState.route) ?? ROUTES[0], [uiState.route]);
 
@@ -111,17 +113,23 @@ export function AppShell() {
       setUiState((current) => toggleVoiceMode(current));
     };
 
+    const handleOpenPalette = () => {
+      setPaletteOpen(true);
+    };
+
     window.addEventListener('hermes:openArtifact', handleOpenArtifact);
     window.addEventListener('hermes:navigate', handleNavigate);
     window.addEventListener('hermes:openModal', handleOpenModal);
     window.addEventListener('hermes:openDrawer', handleOpenDrawer);
     window.addEventListener('hermes:toggleVoiceMode', handleToggleVoice);
+    window.addEventListener('hermes:openCommandPalette', handleOpenPalette);
     return () => {
       window.removeEventListener('hermes:openArtifact', handleOpenArtifact);
       window.removeEventListener('hermes:navigate', handleNavigate);
       window.removeEventListener('hermes:openModal', handleOpenModal);
       window.removeEventListener('hermes:openDrawer', handleOpenDrawer);
       window.removeEventListener('hermes:toggleVoiceMode', handleToggleVoice);
+      window.removeEventListener('hermes:openCommandPalette', handleOpenPalette);
     };
   }, []);
 
@@ -140,6 +148,7 @@ export function AppShell() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       
       if (e.ctrlKey || e.metaKey) {
+        if (e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(true); }
         if (e.key === '1') { e.preventDefault(); navigate('chat'); }
         if (e.key === '2') { e.preventDefault(); navigate('sessions'); }
         if (e.key === '3') { e.preventDefault(); navigate('workspace'); }
@@ -162,6 +171,7 @@ export function AppShell() {
         onToggleDrawer={() => setUiState((current) => toggleDrawer(current))}
         voiceMode={uiState.voiceMode}
         onToggleVoiceMode={() => setUiState((current) => toggleVoiceMode(current))}
+        onOpenCommandPalette={() => setPaletteOpen(true)}
       />
 
       <div className="layout-body">
@@ -197,6 +207,7 @@ export function AppShell() {
         onTabChange={selectModalTab} 
         onClose={() => setUiState((current) => toggleModal(current))} 
       />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ArtifactViewer uiState={uiState} setUiState={setUiState} />
       <Toaster />
     </div>

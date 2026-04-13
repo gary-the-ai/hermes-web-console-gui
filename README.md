@@ -4,9 +4,9 @@
 
 # Hermes Web Console GUI 🖥️✨
 
-Welcome to the **Hermes Web Console GUI**! This repository transforms the core capabilities of the [NousResearch Hermes Agent](https://github.com/NousResearch/hermes-agent) into an exceptional, native web-browser experience. 
+Welcome to the **Hermes Web Console GUI**! This repository transforms the core capabilities of the [NousResearch Hermes Agent](https://github.com/NousResearch/hermes-agent) into an exceptional, native web-browser experience.
 
-It provides absolute feature-parity with the Hermes CLI while drastically reducing the friction of configuration via intuitive, highly-polished React components. 
+It now ships with a shared slash-command registry, a dedicated **Command Browser** page, and broad practical parity with the Hermes CLI while drastically reducing the friction of configuration via intuitive, highly-polished React components.
 
 ## 📸 UI Gallery
 
@@ -73,6 +73,8 @@ Here is a glimpse of the gorgeous new interfaces powering your agent:
 - **Persistent Web Theme Engine**: Customize dark, light, or aesthetic visual skins syncing natively via your local Hermes backend.
 - **Automations & Cron Jobs**: Configure, pause, edit, and track scheduled cron jobs visually without terminal flags.
 - **Advanced CLI Parity**: Support for real-time Streaming Reasoning blocks, dynamic Context Window Usage Monitoring, and interactive Session Branching (Conversation Forking).
+- **Command Browser & Slash Registry**: The web console now consumes the same command registry as the CLI via `/api/gui/commands`, powers composer autocomplete from that shared source, and exposes a dedicated Commands page with parity badges.
+- **Chat-Side Slash Dispatch**: The browser chat now handles a large slice of Hermes slash commands directly in the UI, including configuration commands (`/fast`, `/reasoning`, `/verbose`, `/yolo`), session controls (`/branch`, `/resume`, `/queue`, `/save`), gateway controls (`/platforms`, `/sethome`, `/restart`), and browser-native attachment flows (`/image`, `/paste`).
 
 ## 🚀 Installation & Setup
 
@@ -121,6 +123,26 @@ npm run build
 
 The optimized static assets will populate the `/web_console/dist` directory. This static bundle is drop-in compatible with Vercel, Netlify, Nginx, or directly mounted against the FastAPI endpoints.
 
+## ⌘ Command Parity Notes
+
+The web console now covers most of the high-value Hermes slash command surface in meaningful form, including:
+
+- session controls like `/new`, `/retry`, `/undo`, `/branch`, `/resume`, `/queue`, `/save`
+- configuration controls like `/model`, `/provider`, `/reasoning`, `/verbose`, `/fast`, `/yolo`
+- operational controls like `/platforms`, `/sethome`, `/restart`, `/update`
+- browser-native attachment helpers like `/image` and `/paste`
+
+Some commands remain intentionally partial because browser UX differs from terminal UX:
+
+- `/config`, `/history`, `/usage`, `/platforms`, `/voice`, `/update`, `/restart`
+
+And a few commands are still effectively CLI-only by nature:
+
+- `/statusbar`
+- `/quit`
+
+Use the **Commands** page in the web console to see the current parity badge for every command.
+
 ## 🛠️ Technology Stack
 - **React 19** (Vite 6 Compiler)
 - **TypeScript** natively integrated bounding UI props to strict Python schema counterparts.
@@ -148,6 +170,8 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 ### [2026.4.13] - Universal CLI Command Parity Integrations
 - **Native Slash Dispatchers**: Implemented and mapped real-time conversational UI dispatchers for `/fast`, `/yolo`, `/reasoning`, and `/verbose` tracking the backend behavior identical to the CLI.
 - **Intelligent Autocomplete Registry**: New `/api/gui/commands` schema exposes CLI commands seamlessly inside the Web UI composer preventing stale fallback inputs.
+- **Command Browser**: Added a dedicated Commands page backed by the shared CLI registry, including parity badges so users can see which commands are fully supported, partial, or CLI-only.
+- **Expanded Slash Coverage**: Added practical web-console support for `/queue`, `/branch`, `/resume`, `/save`, `/approve`, `/deny`, `/history`, `/config`, `/platforms`, `/image`, `/paste`, `/restart`, `/update`, and `/sethome`.
 - **Weixin (WeChat) Support**: Gateway Config Center now explicitly supports provisioning tokens and account IDs directly mirroring the new upstream `weixin` integration.
 - **Testing Reliability Fixes**: Repaired React/Vitest application lifecycle mock tests dropping missing event listeners avoiding 100% hard crashes on mount.
 

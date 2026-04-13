@@ -13,6 +13,7 @@ interface TopBarProps {
   onToggleDrawer(): void;
   voiceMode: boolean;
   onToggleVoiceMode(): void;
+  onOpenCommandPalette(): void;
 }
 
 interface VersionResponse {
@@ -71,7 +72,7 @@ const QUICK_MODELS = [
   { alias: 'grok', label: 'Grok', icon: '⚫' },
 ];
 
-export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSettings, onToggleDrawer, onToggleInspector, voiceMode, onToggleVoiceMode }: TopBarProps) {
+export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSettings, onToggleDrawer, onToggleInspector, voiceMode, onToggleVoiceMode, onOpenCommandPalette }: TopBarProps) {
   const [version, setVersion] = useState<string | null>(null);
   const [activeProfile, setActiveProfile] = useState<string | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -381,6 +382,9 @@ export function TopBar({ title, navItems, activeRoute, onNavigate, onToggleSetti
 
       {/* Right: Action buttons */}
       <div className="topbar-actions">
+        <button type="button" className="topbar-action-btn" onClick={onOpenCommandPalette} title="Command Palette (Ctrl/Cmd+K)">
+          ⌘
+        </button>
         <button 
           type="button" 
           className="topbar-action-btn" 

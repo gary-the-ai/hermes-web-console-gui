@@ -113,6 +113,18 @@ interface GatewayRestartResponse {
   message?: string;
 }
 
+interface SessionUsageResponse {
+  ok: boolean;
+  session_usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_tokens: number;
+    cache_write_tokens: number;
+    total_tokens: number;
+    estimated_cost_usd: number;
+  };
+}
+
 const DEFAULT_ITEMS: TranscriptItem[] = [];
 
 function mapGuiEventToTranscriptItem(event: GuiEvent): TranscriptItem | null {
@@ -924,8 +936,48 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
     }
 
     if (command === 'usage') {
-      dispatchUiRoute('usage');
-      addSystemMessage('Opened Usage.', 'Navigation');
+      try {
+        if (sessionId !== 'current') {
+          const res = await apiClient.get<SessionUsageResponse>(`/usage/session/${encodeURIComponent(sessionId)}`);
+          const usage = res.session_usage;
+          if (res.ok && usage) {
+            addSystemMessage(
+              [
+                `Session usage for ${sessionId}:`,
+                `Input tokens: ${usage.input_tokens.toLocaleString()}`,
+                `Output tokens: ${usage.output_tokens.toLocaleString()}`,
+                `Cache read: ${usage.cache_read_tokens.toLocaleString()}`,
+                `Cache write: ${usage.cache_write_tokens.toLocaleString()}`,
+                `Total tokens: ${usage.total_tokens.toLocaleString()}`,
+                `Estimated cost: $${(usage.estimated_cost_usd || 0).toFixed(4)}`,
+              ].join('\n'),
+              'Usage',
+            );
+            return true;
+          }
+        }
+
+        const promptTokens = Number(usageData.prompt_tokens || 0);
+        const completionTokens = Number(usageData.completion_tokens || 0);
+        const totalTokens = Number(usageData.total_tokens || 0);
+        if (promptTokens || completionTokens || totalTokens) {
+          addSystemMessage(
+            [
+              `Current session usage:`,
+              `Prompt tokens: ${promptTokens.toLocaleString()}`,
+              `Completion tokens: ${completionTokens.toLocaleString()}`,
+              `Total tokens: ${totalTokens.toLocaleString()}`,
+            ].join('\n'),
+            'Usage',
+          );
+        } else {
+          dispatchUiRoute('usage');
+          addSystemMessage('Opened Usage. No inline token data is available for this session yet.', 'Usage');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Failed to load usage: ${msg}`, 'Error');
+      }
       return true;
     }
 
@@ -1180,6 +1232,18 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
     addSystemMessage(`/${command} is not wired up in the web command dispatcher yet. Use /help for available commands or the dedicated GUI surfaces.`, 'Command');
     return true;
   };
+
+  useEffect(() => {
+    const handleExecuteCommand = (event: Event) => {
+      const customEvent = event as CustomEvent<{ value?: string }>;
+      const value = String(customEvent.detail?.value || '').trim();
+      if (!value) return;
+      handleSlashCommand(value).catch(() => {});
+    };
+
+    window.addEventListener('hermes:executeCommand', handleExecuteCommand);
+    return () => window.removeEventListener('hermes:executeCommand', handleExecuteCommand);
+  }, [sessionId, runStatus, currentRunId, humanPending, reasoningEffort, showReasoning, toolProgressMode, queuedPrompt, usageData]);
 
   const handleSend = async (prompt: string, attachments: AttachedFile[] = [], isBackground?: boolean, isQuickAsk?: boolean) => {
     if (!attachments.length) {

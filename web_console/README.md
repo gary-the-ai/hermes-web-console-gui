@@ -4,7 +4,7 @@
 
 # Hermes Web Console 🖥️✨
 
-A highly polished, modern web dashboard for **Hermes Agent**. The Web Console brings the raw power of the Hermes terminal and its core configurability directly to the browser, offering feature-parity with the CLI while introducing intuitive drag-and-drop workflows for advanced agentic operations.
+A highly polished, modern web dashboard for **Hermes Agent**. The Web Console brings the raw power of the Hermes terminal and its core configurability directly to the browser, offering broad practical parity with the CLI while introducing intuitive drag-and-drop workflows for advanced agentic operations.
 
 ## ✨ Features
 
@@ -19,6 +19,9 @@ A highly polished, modern web dashboard for **Hermes Agent**. The Web Console br
 - **Visual Configurations**: Avoid editing `config.yaml` manually. Setup complex hierarchies like drag-and-drop ordered **Fallback Providers**, multi-key **Credential Pools**, and isolated Messaging Gateways all from an organized UI.
 - **Theme Persistence**: Dark, light, or completely custom skins. Changes are natively synchronized with your overarching Hermes profile.
 - **Syntax Highlighting & Inline Diffs**: Unified, collapsible Git-style file diffs directly inside the chat interface letting you confidently review the agent's file modifications.
+- **Shared Command Registry**: The composer autocomplete is powered by the same slash-command registry as the Hermes CLI via `/api/gui/commands`.
+- **Command Browser**: A dedicated Commands page lets you browse canonical commands, aliases, usage hints, and parity badges (`Full`, `Partial`, `CLI only`).
+- **Browser-Native Slash Flows**: The chat interface now supports practical web versions of many CLI commands including `/queue`, `/branch`, `/resume`, `/save`, `/platforms`, `/image`, `/paste`, `/fast`, `/yolo`, `/reasoning`, and `/verbose`.
 
 ## 🚀 Quick Start
 
@@ -49,6 +52,17 @@ npm run build
 ```
 
 The optimized static assets will populate the `/dist` directory automatically compatible with most static web-farm configurations or native integrations back onto the python API router.
+
+## ⌘ Slash Commands in the Web Console
+
+The web console supports a large subset of Hermes slash commands directly inside chat. Highlights include:
+
+- **Session**: `/new`, `/retry`, `/undo`, `/branch`, `/resume`, `/queue`, `/save`
+- **Config**: `/model`, `/provider`, `/reasoning`, `/verbose`, `/fast`, `/yolo`
+- **Gateway/Admin**: `/platforms`, `/sethome`, `/restart`, `/update`
+- **Attachments**: `/image`, `/paste`
+
+Some commands are intentionally marked **Partial** because browser behavior differs from terminal behavior. For the current source of truth, use the **Commands** page inside the app.
 
 ## 🛠️ Tech Stack
 - **React.js 18** (Vite Compiler)

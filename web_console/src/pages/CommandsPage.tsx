@@ -26,14 +26,16 @@ type ParityStatus = 'full' | 'partial' | 'cli_only';
 const FULLY_SUPPORTED = new Set([
   'new', 'retry', 'undo', 'title', 'branch', 'compress', 'rollback', 'stop',
   'approve', 'deny', 'background', 'btw', 'queue', 'status', 'profile', 'resume',
-  'config', 'model', 'provider', 'personality', 'verbose', 'yolo', 'reasoning',
-  'fast', 'skin', 'voice', 'tools', 'toolsets', 'skills', 'cron', 'reload-mcp',
-  'browser', 'commands', 'help', 'usage', 'insights', 'platforms', 'paste',
-  'image', 'update', 'restart', 'save', 'history', 'sethome', 'gateway', 'reset', 'bg', 'set-home'
+  'model', 'provider', 'personality', 'verbose', 'yolo', 'reasoning',
+  'fast', 'skin', 'tools', 'toolsets', 'skills', 'cron', 'reload-mcp',
+  'browser', 'commands', 'help', 'usage', 'insights', 'save', 'image', 'paste',
+  'reset', 'bg'
 ]);
 
 const PARTIALLY_SUPPORTED = new Set([
-  'clear', 'statusbar', 'quit', 'exit', 'q'
+  'clear', 'statusbar', 'quit', 'exit', 'q',
+  'config', 'history', 'platforms', 'gateway', 'sethome', 'set-home',
+  'voice', 'update', 'restart'
 ]);
 
 function parityFor(command: CommandEntry): ParityStatus {

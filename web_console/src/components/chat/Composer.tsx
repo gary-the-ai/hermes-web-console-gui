@@ -70,6 +70,7 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -195,14 +196,23 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
     const handleOpenFilePicker = () => {
       handleFileSelect();
     };
+    const handlePrefillComposer = (event: Event) => {
+      const customEvent = event as CustomEvent<{ value?: string }>;
+      const value = customEvent.detail?.value ?? '';
+      setPrompt(value);
+      handlePromptChange(value);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    };
     const handlePasteClipboard = async () => {
       const success = await pasteClipboardImage();
       window.dispatchEvent(new CustomEvent('hermes:composerPasteResult', { detail: { success } }));
     };
     window.addEventListener('hermes:composerOpenFilePicker', handleOpenFilePicker);
+    window.addEventListener('hermes:prefillComposer', handlePrefillComposer);
     window.addEventListener('hermes:composerPasteClipboard', handlePasteClipboard);
     return () => {
       window.removeEventListener('hermes:composerOpenFilePicker', handleOpenFilePicker);
+      window.removeEventListener('hermes:prefillComposer', handlePrefillComposer);
       window.removeEventListener('hermes:composerPasteClipboard', handlePasteClipboard);
     };
   }, []);
@@ -530,6 +540,7 @@ export function Composer({ onSend, onNewChat, reasoningEffort, onReasoningChange
           />
 
           <textarea
+            ref={textareaRef}
             id="chat-prompt"
             className="composer-textarea"
             style={{ margin: 0, minHeight: '44px', maxHeight: '200px', border: 'none', background: 'transparent', boxShadow: 'none', padding: '4px 8px', fontSize: '1.05rem', resize: 'none', outline: 'none', color: '#f4f4f5' }}
