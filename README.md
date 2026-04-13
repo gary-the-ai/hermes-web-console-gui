@@ -145,6 +145,12 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 
 ## 📜 Changelog
 
+### [2026.4.13] - Universal CLI Command Parity Integrations
+- **Native Slash Dispatchers**: Implemented and mapped real-time conversational UI dispatchers for `/fast`, `/yolo`, `/reasoning`, and `/verbose` tracking the backend behavior identical to the CLI.
+- **Intelligent Autocomplete Registry**: New `/api/gui/commands` schema exposes CLI commands seamlessly inside the Web UI composer preventing stale fallback inputs.
+- **Weixin (WeChat) Support**: Gateway Config Center now explicitly supports provisioning tokens and account IDs directly mirroring the new upstream `weixin` integration.
+- **Testing Reliability Fixes**: Repaired React/Vitest application lifecycle mock tests dropping missing event listeners avoiding 100% hard crashes on mount.
+
 ### [2026.4.12b] - Upstream Sync & Infrastructure Enhancements
 - **Guided Context Compression**: Added 'focus_topic' injections gracefully extending context compression strategies directly from the UI chat.
 - **System Backup & Restore**: New Settings card exposing one-click zip archive downloads (`~/.hermes`) and GUI file upload restorations seamlessly mirroring the new CLI capability.
