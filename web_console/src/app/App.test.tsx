@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from './App';
 import { PRIMARY_NAV_ITEMS } from './router';
 
@@ -240,12 +240,14 @@ describe('App shell', () => {
     expect(es).not.toBeNull();
     expect(es!.url).toContain('/api/gui/stream/session/session-live');
 
-    es!.simulateMessage({
-      type: 'tool.started',
-      session_id: 'session-live',
-      run_id: 'run-1',
-      payload: { tool_name: 'search_files', preview: 'search_files(pattern=*.py)' },
-      ts: Date.now() / 1000
+    await act(async () => {
+      es!.simulateMessage({
+        type: 'tool.started',
+        session_id: 'session-live',
+        run_id: 'run-1',
+        payload: { tool_name: 'search_files', preview: 'search_files(pattern=*.py)' },
+        ts: Date.now() / 1000
+      });
     });
 
     await waitFor(() => {
@@ -253,12 +255,14 @@ describe('App shell', () => {
       expect(screen.getByLabelText(/Tool timeline/i)).toBeInTheDocument();
     });
 
-    es!.simulateMessage({
-      type: 'message.assistant.completed',
-      session_id: 'session-live',
-      run_id: 'run-1',
-      payload: { content: 'Hermes completed analysis.' },
-      ts: Date.now() / 1000
+    await act(async () => {
+      es!.simulateMessage({
+        type: 'message.assistant.completed',
+        session_id: 'session-live',
+        run_id: 'run-1',
+        payload: { content: 'Hermes completed analysis.' },
+        ts: Date.now() / 1000
+      });
     });
 
     await waitFor(() => {
