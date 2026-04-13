@@ -3,10 +3,10 @@ import { apiClient } from '../../lib/api';
 import type { DrawerTab, ModalTab, PrimaryRoute } from '../../lib/types';
 
 type PaletteAction =
-  | { id: string; group: 'navigate' | 'panels' | 'commands'; kind: 'route'; label: string; hint: string; keywords: string[]; route: PrimaryRoute }
-  | { id: string; group: 'navigate' | 'panels' | 'commands'; kind: 'modal'; label: string; hint: string; keywords: string[]; tab: ModalTab }
-  | { id: string; group: 'navigate' | 'panels' | 'commands'; kind: 'drawer'; label: string; hint: string; keywords: string[]; tab: DrawerTab }
-  | { id: string; group: 'navigate' | 'panels' | 'commands'; kind: 'command'; label: string; hint: string; keywords: string[]; command: string; executeDirectly?: boolean };
+  | { id: string; group: 'pinned' | 'recent' | 'navigate' | 'panels' | 'commands'; kind: 'route'; label: string; hint: string; keywords: string[]; route: PrimaryRoute }
+  | { id: string; group: 'pinned' | 'recent' | 'navigate' | 'panels' | 'commands'; kind: 'modal'; label: string; hint: string; keywords: string[]; tab: ModalTab }
+  | { id: string; group: 'pinned' | 'recent' | 'navigate' | 'panels' | 'commands'; kind: 'drawer'; label: string; hint: string; keywords: string[]; tab: DrawerTab }
+  | { id: string; group: 'pinned' | 'recent' | 'navigate' | 'panels' | 'commands'; kind: 'command'; label: string; hint: string; keywords: string[]; command: string; executeDirectly?: boolean };
 
 interface CommandEntry {
   name: string;
@@ -49,8 +49,14 @@ const CORE_ACTIONS: PaletteAction[] = [
 ];
 
 const EXECUTE_DIRECTLY = new Set(['help', 'commands', 'status', 'usage', 'history', 'save', 'platforms', 'gateway', 'paste', 'restart', 'update', 'tools', 'toolsets', 'skills', 'browser', 'insights', 'cron', 'new']);
+const PINNED_ACTIONS_STORAGE_KEY = 'hermes-command-palette-pinned';
+const RECENT_ACTIONS_STORAGE_KEY = 'hermes-command-palette-recent';
+const MAX_RECENT_ACTIONS = 8;
+const MAX_PINNED_ACTIONS = 12;
 
 const GROUP_LABELS: Record<PaletteAction['group'], string> = {
+  pinned: 'Pinned',
+  recent: 'Recent',
   navigate: 'Navigate',
   panels: 'Panels & Drawers',
   commands: 'Slash Commands',
@@ -98,6 +104,34 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const [commandActions, setCommandActions] = useState<PaletteAction[]>([]);
+  const [pinnedActionIds, setPinnedActionIds] = useState<string[]>([]);
+  const [recentActionIds, setRecentActionIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PINNED_ACTIONS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setPinnedActionIds(parsed.filter((item): item is string => typeof item === 'string').slice(0, MAX_PINNED_ACTIONS));
+      }
+    } catch {
+      // ignore malformed localStorage
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RECENT_ACTIONS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setRecentActionIds(parsed.filter((item): item is string => typeof item === 'string').slice(0, MAX_RECENT_ACTIONS));
+      }
+    } catch {
+      // ignore malformed localStorage
+    }
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -137,18 +171,38 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   }, [open]);
 
   const actions = useMemo(() => [...CORE_ACTIONS, ...commandActions], [commandActions]);
+  const pinnedActions = useMemo(() => {
+    if (query.trim()) return [] as PaletteAction[];
+    return pinnedActionIds
+      .map((id) => actions.find((action) => action.id === id))
+      .filter((action): action is PaletteAction => Boolean(action))
+      .map((action) => ({ ...action, group: 'pinned' as const }));
+  }, [actions, pinnedActionIds, query]);
+  const recentActions = useMemo(() => {
+    if (query.trim()) return [] as PaletteAction[];
+    return recentActionIds
+      .map((id) => actions.find((action) => action.id === id))
+      .filter((action): action is PaletteAction => Boolean(action))
+      .map((action) => ({ ...action, group: 'recent' as const }));
+  }, [actions, recentActionIds, query]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return actions;
+    if (!q) {
+      return [
+        ...pinnedActions,
+        ...recentActions.filter((action) => !pinnedActionIds.includes(action.id)),
+        ...actions.filter((action) => !pinnedActionIds.includes(action.id) && !recentActionIds.includes(action.id)),
+      ];
+    }
     return actions
       .map((action) => ({ action, score: rankAction(action, q) }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score || a.action.label.localeCompare(b.action.label))
       .map(({ action }) => action);
-  }, [actions, query]);
+  }, [actions, pinnedActions, recentActions, pinnedActionIds, recentActionIds, query]);
 
   const grouped = useMemo(() => {
-    const order: PaletteAction['group'][] = ['navigate', 'panels', 'commands'];
+    const order: PaletteAction['group'][] = ['pinned', 'recent', 'navigate', 'panels', 'commands'];
     return order.map((group) => ({
       group,
       items: filtered.filter((action) => action.group === group),
@@ -158,6 +212,32 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   useEffect(() => {
     setSelected(0);
   }, [query]);
+
+  const rememberAction = (action: PaletteAction) => {
+    setRecentActionIds((prev) => {
+      const next = [action.id].concat(prev.filter((id) => id !== action.id)).slice(0, MAX_RECENT_ACTIONS);
+      try {
+        localStorage.setItem(RECENT_ACTIONS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore storage failures
+      }
+      return next;
+    });
+  };
+
+  const togglePinnedAction = (action: PaletteAction) => {
+    setPinnedActionIds((prev) => {
+      const next = prev.includes(action.id)
+        ? prev.filter((id) => id !== action.id)
+        : [action.id].concat(prev).slice(0, MAX_PINNED_ACTIONS);
+      try {
+        localStorage.setItem(PINNED_ACTIONS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore storage failures
+      }
+      return next;
+    });
+  };
 
   if (!open) return null;
 
@@ -225,11 +305,13 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               </div>
               {section.items.map((action) => {
                 const index = filtered.findIndex((candidate) => candidate.id === action.id);
+                const isPinned = pinnedActionIds.includes(action.id);
                 return (
                   <button
                     key={action.id}
                     type="button"
                     onClick={() => {
+                      rememberAction(action);
                       fireAction(action);
                       onClose();
                     }}
@@ -256,7 +338,33 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                       <div style={{ fontSize: '0.92rem', fontWeight: 600 }}>{action.label}</div>
                       <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>{action.hint}</div>
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '999px', padding: '4px 8px' }}>{action.kind}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePinnedAction(action);
+                        }}
+                        title={isPinned ? 'Unpin action' : 'Pin action'}
+                        style={{
+                          background: isPinned ? 'rgba(251,191,36,0.14)' : 'rgba(255,255,255,0.04)',
+                          color: isPinned ? '#fde68a' : '#94a3b8',
+                          border: `1px solid ${isPinned ? 'rgba(251,191,36,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                          borderRadius: '999px',
+                          padding: '4px 8px',
+                          fontSize: '0.72rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {isPinned ? '★ pinned' : '☆ pin'}
+                      </button>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '999px', padding: '4px 8px' }}>{action.kind}</div>
+                      {action.kind === 'command' && (
+                        <div style={{ fontSize: '0.66rem', color: action.executeDirectly ? '#86efac' : '#a5b4fc' }}>
+                          {action.executeDirectly ? 'executes now' : 'prefills chat'}
+                        </div>
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -265,6 +373,10 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           {filtered.length === 0 && (
             <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>No actions matched your search.</div>
           )}
+        </div>
+        <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', gap: '12px', color: '#64748b', fontSize: '0.74rem' }}>
+          <span>↑↓ move · Enter launch · Esc close</span>
+          <span>Ctrl/Cmd+K to reopen</span>
         </div>
       </div>
     </div>
