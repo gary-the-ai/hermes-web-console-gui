@@ -29,6 +29,7 @@ describe('App shell', () => {
     global.EventSource = MockEventSource as unknown as typeof EventSource;
     MockEventSource.lastInstance = null;
     window.location.hash = '';
+    localStorage.clear();
 
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -139,7 +140,11 @@ describe('App shell', () => {
         );
       }
       if (url.includes('/api/gui/commands')) {
-        return new Response(JSON.stringify({ ok: true, commands: [] }), { status: 200 });
+        return new Response(JSON.stringify({ ok: true, commands: [
+          { name: 'help', description: 'Show available commands', category: 'Info', aliases: [], names: ['help'], args_hint: '', subcommands: [], cli_only: false, gateway_only: false },
+          { name: 'model', description: 'Switch model for this session', category: 'Configuration', aliases: [], names: ['model'], args_hint: '[model]', subcommands: [], cli_only: false, gateway_only: false },
+          { name: 'queue', description: 'Queue a prompt for the next turn', category: 'Session', aliases: ['q'], names: ['queue', 'q'], args_hint: '<prompt>', subcommands: [], cli_only: false, gateway_only: false }
+        ] }), { status: 200 });
       }
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }) as typeof fetch;
@@ -245,6 +250,7 @@ describe('App shell', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/search_files\(pattern=\*\.py\)/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Tool timeline/i)).toBeInTheDocument();
     });
 
     es!.simulateMessage({
@@ -278,5 +284,45 @@ describe('App shell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'tools' }));
     expect(screen.getByRole('button', { name: 'tools' }).className).toContain('panel-tab-active');
+  });
+
+  it('opens the command palette and prefills slash commands into chat', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTitle(/Command Palette/i));
+    expect(await screen.findByText(/Command Palette/i)).toBeInTheDocument();
+
+    const search = screen.getByPlaceholderText(/Search routes, actions, or commands/i);
+    fireEvent.change(search, { target: { value: 'model' } });
+
+    const runModelButton = screen.getAllByRole('button').find((button) => button.textContent?.includes('Run /model'));
+    expect(runModelButton).toBeTruthy();
+    fireEvent.click(runModelButton as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Composer')).toBeInTheDocument();
+      const textarea = document.querySelector('#chat-prompt') as HTMLTextAreaElement | null;
+      expect(textarea?.value).toBe('/model ');
+    });
+  });
+
+  it('can pin actions from the command palette and show them in the pinned section', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTitle(/Command Palette/i));
+    expect(await screen.findByText(/Command Palette/i)).toBeInTheDocument();
+
+    const openUsageLabel = await screen.findByText(/Open Usage/i);
+    const openUsage = openUsageLabel.closest('[role="button"]') as HTMLElement;
+    const pinButton = within(openUsage).getByRole('button', { name: /☆ pin/i });
+    fireEvent.click(pinButton);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '✕' })[0]);
+    fireEvent.click(screen.getByTitle(/Command Palette/i));
+
+    expect(await screen.findByText('Pinned')).toBeInTheDocument();
+    const pinnedHeading = screen.getByText('Pinned');
+    const pinnedSection = pinnedHeading.parentElement as HTMLElement;
+    expect(within(pinnedSection).getByText(/Open Usage/i)).toBeInTheDocument();
   });
 });

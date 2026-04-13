@@ -142,6 +142,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    let loadedCommands = false;
     apiClient.get<CommandsResponse>('/commands')
       .then((res) => {
         if (!res.ok || cancelled) return;
@@ -155,11 +156,12 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           command: `/${command.name}${command.name === 'help' || command.name === 'commands' ? '' : ' '}`,
           executeDirectly: EXECUTE_DIRECTLY.has(command.name),
         }));
+        loadedCommands = actions.length > 0;
         setCommandActions(actions);
       })
       .catch(() => {})
       .finally(() => {
-        if (!cancelled && commandActions.length === 0) {
+        if (!cancelled && !loadedCommands) {
           setCommandActions([
             { id: 'command-help', group: 'commands', kind: 'command', label: 'Run /help', hint: 'Show available commands', keywords: ['help', 'commands'], command: '/help', executeDirectly: true },
           ]);
@@ -307,15 +309,25 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                 const index = filtered.findIndex((candidate) => candidate.id === action.id);
                 const isPinned = pinnedActionIds.includes(action.id);
                 return (
-                  <button
+                  <div
                     key={action.id}
-                    type="button"
                     onClick={() => {
                       rememberAction(action);
                       fireAction(action);
                       onClose();
                     }}
                     onMouseEnter={() => setSelected(index)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        rememberAction(action);
+                        fireAction(action);
+                        onClose();
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={action.label}
                     style={{
                       display: 'grid',
                       gridTemplateColumns: 'auto 1fr auto',
@@ -365,7 +377,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                         </div>
                       )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

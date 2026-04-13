@@ -1343,7 +1343,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
            onNewChat={resetChat}
         />
       )}
-      <div className="chat-layout" style={{ flex: 1, position: 'relative' }}>
+      <div className="chat-layout" style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: toolEvents.length > 0 ? 'minmax(0, 1fr) 280px' : 'minmax(0, 1fr)', gap: '16px' }}>
         {/* Toggle button on top-left of chat layout */}
         <button 
            onClick={() => setSidebarOpen(!sidebarOpen)} 
@@ -1352,7 +1352,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
         >
            ☰
         </button>
-        <div className="chat-main-column" style={{ paddingLeft: '48px' }}>
+        <div className="chat-main-column" style={{ paddingLeft: '48px', minWidth: 0 }}>
           <Transcript items={items} sessionId={sessionId} onBranch={handleBranch} />
           <div ref={scrollRef} />
 
@@ -1461,6 +1461,11 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
         />
         <UsageBar usage={usageData} />
       </div>
+      {toolEvents.length > 0 && (
+        <div style={{ minWidth: 0, paddingRight: '12px', paddingTop: '56px' }}>
+          <ToolTimeline events={toolEvents} />
+        </div>
+      )}
     </div>
     </div>
   );
