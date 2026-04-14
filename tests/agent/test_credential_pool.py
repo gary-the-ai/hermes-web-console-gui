@@ -252,6 +252,8 @@ def test_exhausted_402_entry_resets_after_one_hour(tmp_path, monkeypatch):
 
 def test_explicit_reset_timestamp_overrides_default_429_ttl(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "empty-codex-home"))
+    monkeypatch.setattr("hermes_cli.auth._import_codex_cli_tokens", lambda: None)
     _write_auth_store(
         tmp_path,
         {
@@ -264,7 +266,7 @@ def test_explicit_reset_timestamp_overrides_default_429_ttl(tmp_path, monkeypatc
                         "auth_type": "oauth",
                         "priority": 0,
                         "source": "manual:device_code",
-                        "access_token": "tok-1",
+                        "access_token": "***",
                         "last_status": "exhausted",
                         "last_status_at": time.time() - 7200,
                         "last_error_code": 429,

@@ -208,20 +208,19 @@ class TestMem0UserIdScoping:
 
 
 class TestHonchoUserIdScoping:
-    """Verify Honcho plugin uses gateway user_id for peer_name when provided."""
+    """Verify Honcho plugin uses gateway user_id only when no explicit peer_name exists."""
 
-    def test_gateway_user_id_overrides_peer_name(self):
-        """When user_id is in kwargs, cfg.peer_name should be overridden."""
+    def test_gateway_user_id_fills_missing_peer_name(self):
+        """When user_id is in kwargs and peer_name is unset, cfg.peer_name should be populated."""
         from plugins.memory.honcho import HonchoMemoryProvider
 
         provider = HonchoMemoryProvider()
 
-        # Create a mock config with a static peer_name
         mock_cfg = MagicMock()
         mock_cfg.enabled = True
         mock_cfg.api_key = "test-key"
         mock_cfg.base_url = None
-        mock_cfg.peer_name = "static-user"
+        mock_cfg.peer_name = None
         mock_cfg.recall_mode = "tools"  # Use tools mode to defer session init
 
         with patch(
@@ -234,8 +233,32 @@ class TestHonchoUserIdScoping:
                 platform="discord",
             )
 
-        # The config's peer_name should have been overridden with the user_id
         assert mock_cfg.peer_name == "discord_user_789"
+
+    def test_gateway_user_id_does_not_override_explicit_peer_name(self):
+        """An explicit peer_name should win over a gateway user_id."""
+        from plugins.memory.honcho import HonchoMemoryProvider
+
+        provider = HonchoMemoryProvider()
+
+        mock_cfg = MagicMock()
+        mock_cfg.enabled = True
+        mock_cfg.api_key = "test-key"
+        mock_cfg.base_url = None
+        mock_cfg.peer_name = "static-user"
+        mock_cfg.recall_mode = "tools"
+
+        with patch(
+            "plugins.memory.honcho.client.HonchoClientConfig.from_global_config",
+            return_value=mock_cfg,
+        ):
+            provider.initialize(
+                session_id="test-sess",
+                user_id="discord_user_789",
+                platform="discord",
+            )
+
+        assert mock_cfg.peer_name == "static-user"
 
     def test_no_user_id_preserves_config_peer_name(self):
         """Without user_id, the config peer_name should be preserved."""
@@ -259,7 +282,6 @@ class TestHonchoUserIdScoping:
                 platform="cli",
             )
 
-        # peer_name should not have been overridden
         assert mock_cfg.peer_name == "my-custom-peer"
 
 

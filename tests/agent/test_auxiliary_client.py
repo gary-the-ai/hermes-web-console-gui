@@ -10,6 +10,7 @@ import pytest
 
 from agent.auxiliary_client import (
     get_text_auxiliary_client,
+    get_vision_auxiliary_client,
     get_available_vision_backends,
     resolve_vision_provider_client,
     resolve_provider_client,
@@ -89,6 +90,7 @@ class TestReadCodexAccessToken:
         hermes_home.mkdir(parents=True, exist_ok=True)
         (hermes_home / "auth.json").write_text(json.dumps({"version": 1, "providers": {}}))
         monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("CODEX_HOME", str(tmp_path / "empty-codex-home"))
         result = _read_codex_access_token()
         assert result is None
 
@@ -141,11 +143,12 @@ class TestReadCodexAccessToken:
             "version": 1,
             "providers": {
                 "openai-codex": {
-                    "tokens": {"access_token": expired_jwt, "refresh_token": "r"},
+                    "tokens": {"access_token": expired_jwt, "refresh_token": "***"},
                 },
             },
         }))
         monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("CODEX_HOME", str(tmp_path / "empty-codex-home"))
         result = _read_codex_access_token()
         assert result is None, "Expired JWT should return None"
 
@@ -619,12 +622,15 @@ class TestGetTextAuxiliaryClient:
         assert isinstance(client, CodexAuxiliaryClient)
         assert model == "gpt-5.2-codex"
 
-    def test_returns_none_when_nothing_available(self, monkeypatch):
+    def test_returns_none_when_nothing_available(self, monkeypatch, tmp_path):
         monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+        monkeypatch.setenv("CODEX_HOME", str(tmp_path / "empty-codex-home"))
         with patch("agent.auxiliary_client._read_nous_auth", return_value=None), \
-             patch("agent.auxiliary_client._read_codex_access_token", return_value=None), \
+             patch("agent.auxiliary_client._try_codex", return_value=(None, None)), \
+             patch("agent.auxiliary_client._try_custom_endpoint", return_value=(None, None)), \
              patch("agent.auxiliary_client._resolve_api_key_provider", return_value=(None, None)):
             client, model = get_text_auxiliary_client()
         assert client is None
