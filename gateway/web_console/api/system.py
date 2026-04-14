@@ -22,6 +22,99 @@ from aiohttp import web
 logger = logging.getLogger(__name__)
 
 
+async def handle_system_reload(request: web.Request) -> web.Response:
+    """Reload ~/.hermes/.env into the running process environment."""
+    try:
+        from hermes_cli.config import reload_env
+
+        updated = int(reload_env())
+        return web.json_response({
+            "ok": True,
+            "updated": updated,
+            "message": f"Reloaded .env ({updated} var(s) updated)",
+        })
+    except Exception as exc:
+        logger.exception("Reload .env failed")
+        return web.json_response({"ok": False, "error": str(exc)}, status=500)
+
+
+async def handle_system_debug(request: web.Request) -> web.Response:
+    """Collect a debug report and either upload it or return it locally."""
+    try:
+        payload = await request.json() if request.can_read_body else {}
+    except Exception:
+        payload = {}
+
+    lines = payload.get("lines", 200)
+    expire = payload.get("expire", 7)
+    local = bool(payload.get("local", False))
+    try:
+        lines = max(10, min(int(lines), 2000))
+    except (TypeError, ValueError):
+        lines = 200
+    try:
+        expire = max(1, min(int(expire), 365))
+    except (TypeError, ValueError):
+        expire = 7
+
+    loop = asyncio.get_running_loop()
+
+    def _collect_debug_payload() -> dict:
+        from hermes_cli.debug import _capture_dump, _read_full_log, collect_debug_report, upload_to_pastebin
+
+        dump_text = _capture_dump()
+        report = collect_debug_report(log_lines=lines, dump_text=dump_text)
+        agent_log = _read_full_log("agent")
+        gateway_log = _read_full_log("gateway")
+
+        if agent_log:
+            agent_log = dump_text + "\n\n--- full agent.log ---\n" + agent_log
+        if gateway_log:
+            gateway_log = dump_text + "\n\n--- full gateway.log ---\n" + gateway_log
+
+        if local:
+            return {
+                "ok": True,
+                "mode": "local",
+                "report": report,
+                "agent_log": agent_log,
+                "gateway_log": gateway_log,
+            }
+
+        failures: list[str] = []
+        report_url = upload_to_pastebin(report, expiry_days=expire)
+        agent_log_url = None
+        gateway_log_url = None
+
+        if agent_log:
+            try:
+                agent_log_url = upload_to_pastebin(agent_log, expiry_days=expire)
+            except Exception as exc:
+                failures.append(f"agent.log: {exc}")
+
+        if gateway_log:
+            try:
+                gateway_log_url = upload_to_pastebin(gateway_log, expiry_days=expire)
+            except Exception as exc:
+                failures.append(f"gateway.log: {exc}")
+
+        return {
+            "ok": True,
+            "mode": "upload",
+            "report_url": report_url,
+            "agent_log_url": agent_log_url,
+            "gateway_log_url": gateway_log_url,
+            "failures": failures,
+        }
+
+    try:
+        result = await loop.run_in_executor(None, _collect_debug_payload)
+        return web.json_response(result)
+    except Exception as exc:
+        logger.exception("Debug report generation failed")
+        return web.json_response({"ok": False, "error": str(exc)}, status=500)
+
+
 async def handle_system_backup(request: web.Request) -> web.StreamResponse:
     """Stream a zip backup of HERMES_HOME to the browser."""
     loop = asyncio.get_running_loop()
@@ -174,5 +267,7 @@ async def handle_system_restore(request: web.Request) -> web.Response:
 
 def register_system_api_routes(app: web.Application) -> None:
     """Register system backup/restore API routes."""
+    app.router.add_post("/api/gui/system/reload", handle_system_reload)
+    app.router.add_post("/api/gui/system/debug", handle_system_debug)
     app.router.add_get("/api/gui/system/backup", handle_system_backup)
     app.router.add_post("/api/gui/system/restore", handle_system_restore)

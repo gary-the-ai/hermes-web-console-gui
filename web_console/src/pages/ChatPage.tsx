@@ -113,6 +113,24 @@ interface GatewayRestartResponse {
   message?: string;
 }
 
+interface SystemReloadResponse {
+  ok: boolean;
+  updated?: number;
+  message?: string;
+}
+
+interface SystemDebugResponse {
+  ok: boolean;
+  mode?: 'upload' | 'local';
+  report_url?: string | null;
+  agent_log_url?: string | null;
+  gateway_log_url?: string | null;
+  failures?: string[];
+  report?: string;
+  agent_log?: string | null;
+  gateway_log?: string | null;
+}
+
 interface SessionUsageResponse {
   ok: boolean;
   session_usage?: {
@@ -720,6 +738,69 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
       const exportUrl = `${backend ? `${backend}/api/gui` : '/api/gui'}/sessions/${encodeURIComponent(sessionId)}/export?format=json`;
       window.open(exportUrl, '_blank', 'noopener,noreferrer');
       addSystemMessage(`Export started for session ${sessionId}.`, 'Save');
+      return true;
+    }
+
+    if (command === 'snapshot' || command === 'snap') {
+      try {
+        const base = getBackendUrl();
+        const res = await fetch(`${base}/api/gui/system/backup`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        const filename = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'hermes-backup.zip';
+        const fileCount = res.headers.get('X-Backup-Files') || '?';
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          link.remove();
+        }, 1000);
+        dispatchUiModal('settings');
+        addSystemMessage(`Snapshot export started. Downloaded ${filename} with ${fileCount} file(s). Opened Settings so you can also restore backups.`, 'Snapshot');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Snapshot export failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'reload') {
+      try {
+        const res = await apiClient.post<SystemReloadResponse>('/system/reload', {});
+        addSystemMessage(res.message || `Reloaded .env (${res.updated ?? 0} var(s) updated)`, 'Reload');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Reload failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'debug') {
+      const local = args === 'local';
+      try {
+        const res = await apiClient.post<SystemDebugResponse>('/system/debug', { local });
+        if (res.mode === 'local') {
+          addSystemMessage(`Local debug report:\n\n${res.report || '(empty report)'}`, 'Debug');
+        } else {
+          const lines = [
+            res.report_url ? `Report: ${res.report_url}` : null,
+            res.agent_log_url ? `agent.log: ${res.agent_log_url}` : null,
+            res.gateway_log_url ? `gateway.log: ${res.gateway_log_url}` : null,
+            res.failures && res.failures.length ? `Failed uploads: ${res.failures.join(', ')}` : null,
+          ].filter(Boolean);
+          addSystemMessage(`Debug report ready.${lines.length ? `\n\n${lines.join('\n')}` : ''}`, 'Debug');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Debug report failed: ${msg}`, 'Error');
+      }
       return true;
     }
 

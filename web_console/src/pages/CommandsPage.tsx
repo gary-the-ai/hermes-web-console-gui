@@ -27,7 +27,7 @@ const FULLY_SUPPORTED = new Set([
   'new', 'retry', 'undo', 'title', 'branch', 'compress', 'rollback', 'stop',
   'approve', 'deny', 'background', 'btw', 'queue', 'status', 'profile', 'resume',
   'model', 'provider', 'personality', 'verbose', 'yolo', 'reasoning',
-  'fast', 'skin', 'tools', 'toolsets', 'skills', 'cron', 'reload-mcp',
+  'fast', 'skin', 'tools', 'toolsets', 'skills', 'cron', 'reload', 'reload-mcp',
   'browser', 'commands', 'help', 'usage', 'insights', 'save', 'image', 'paste',
   'reset', 'bg'
 ]);
@@ -35,7 +35,7 @@ const FULLY_SUPPORTED = new Set([
 const PARTIALLY_SUPPORTED = new Set([
   'clear', 'statusbar', 'quit', 'exit', 'q',
   'config', 'history', 'platforms', 'gateway', 'sethome', 'set-home',
-  'voice', 'update', 'restart'
+  'voice', 'update', 'restart', 'snapshot', 'snap', 'debug'
 ]);
 
 function parityFor(command: CommandEntry): ParityStatus {

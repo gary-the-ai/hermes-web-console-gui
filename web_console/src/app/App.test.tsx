@@ -33,6 +33,12 @@ describe('App shell', () => {
 
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (!(URL as any).createObjectURL) {
+        (URL as any).createObjectURL = vi.fn(() => 'blob:mock');
+      }
+      if (!(URL as any).revokeObjectURL) {
+        (URL as any).revokeObjectURL = vi.fn();
+      }
       if (url.includes('/api/gui/human/pending')) {
         return new Response(JSON.stringify({ ok: true, pending: [] }), { status: 200 });
       }
@@ -143,8 +149,26 @@ describe('App shell', () => {
         return new Response(JSON.stringify({ ok: true, commands: [
           { name: 'help', description: 'Show available commands', category: 'Info', aliases: [], names: ['help'], args_hint: '', subcommands: [], cli_only: false, gateway_only: false },
           { name: 'model', description: 'Switch model for this session', category: 'Configuration', aliases: [], names: ['model'], args_hint: '[model]', subcommands: [], cli_only: false, gateway_only: false },
-          { name: 'queue', description: 'Queue a prompt for the next turn', category: 'Session', aliases: ['q'], names: ['queue', 'q'], args_hint: '<prompt>', subcommands: [], cli_only: false, gateway_only: false }
+          { name: 'queue', description: 'Queue a prompt for the next turn', category: 'Session', aliases: ['q'], names: ['queue', 'q'], args_hint: '<prompt>', subcommands: [], cli_only: false, gateway_only: false },
+          { name: 'snapshot', description: 'Create or restore state snapshots of Hermes config/state', category: 'Session', aliases: ['snap'], names: ['snapshot', 'snap'], args_hint: '[create|restore <id>|prune]', subcommands: [], cli_only: false, gateway_only: false },
+          { name: 'reload', description: 'Reload .env variables into the running session', category: 'Tools & Skills', aliases: [], names: ['reload'], args_hint: '', subcommands: [], cli_only: false, gateway_only: false },
+          { name: 'debug', description: 'Upload debug report and get shareable links', category: 'Info', aliases: [], names: ['debug'], args_hint: '[share|local]', subcommands: [], cli_only: false, gateway_only: false }
         ] }), { status: 200 });
+      }
+      if (url.includes('/api/gui/system/reload')) {
+        return new Response(JSON.stringify({ ok: true, updated: 2, message: 'Reloaded .env (2 var(s) updated)' }), { status: 200 });
+      }
+      if (url.includes('/api/gui/system/debug')) {
+        return new Response(JSON.stringify({ ok: true, mode: 'upload', report_url: 'https://paste.test/report', agent_log_url: 'https://paste.test/agent', gateway_log_url: null, failures: [] }), { status: 200 });
+      }
+      if (url.includes('/api/gui/system/backup')) {
+        return new Response('backup-bytes', {
+          status: 200,
+          headers: {
+            'Content-Disposition': 'attachment; filename="hermes-backup-test.zip"',
+            'X-Backup-Files': '7',
+          },
+        });
       }
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }) as typeof fetch;
@@ -285,6 +309,45 @@ describe('App shell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'tools' }));
     expect(screen.getByRole('button', { name: 'tools' }).className).toContain('panel-tab-active');
+  });
+
+  it('runs /snapshot, /reload, and /debug slash commands in chat', async () => {
+    render(<App />);
+
+    const prompt = screen.getByPlaceholderText(/Message Hermes.../i);
+    const composer = screen.getByLabelText('Composer');
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/snapshot' } });
+      fireEvent.submit(composer);
+    });
+
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/system/backup'))).toBe(true);
+    });
+    expect(openSpy).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/reload' } });
+      fireEvent.submit(composer);
+    });
+
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/system/reload'))).toBe(true);
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/debug' } });
+      fireEvent.submit(composer);
+    });
+
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/system/debug'))).toBe(true);
+    });
+    anchorClick.mockRestore();
+    openSpy.mockRestore();
   });
 
   it('opens the command palette and prefills slash commands into chat', async () => {
