@@ -29,13 +29,13 @@ const FULLY_SUPPORTED = new Set([
   'model', 'provider', 'personality', 'verbose', 'yolo', 'reasoning',
   'fast', 'skin', 'tools', 'toolsets', 'skills', 'cron', 'reload', 'reload-mcp',
   'browser', 'commands', 'help', 'usage', 'insights', 'save', 'image', 'paste',
-  'reset', 'bg'
+  'reset', 'bg', 'snapshot', 'snap'
 ]);
 
 const PARTIALLY_SUPPORTED = new Set([
   'clear', 'statusbar', 'quit', 'exit', 'q',
   'config', 'history', 'platforms', 'gateway', 'sethome', 'set-home',
-  'voice', 'update', 'restart', 'snapshot', 'snap', 'debug'
+  'voice', 'update', 'restart', 'debug'
 ]);
 
 function parityFor(command: CommandEntry): ParityStatus {

@@ -22,6 +22,112 @@ from aiohttp import web
 logger = logging.getLogger(__name__)
 
 
+def _json_error(message: str, *, status: int = 400) -> web.Response:
+    return web.json_response({"ok": False, "error": message}, status=status)
+
+
+async def handle_snapshot_list(request: web.Request) -> web.Response:
+    """List recent quick state snapshots."""
+    try:
+        from hermes_cli.backup import list_quick_snapshots
+
+        raw_limit = request.query.get("limit", "20")
+        try:
+            limit = max(1, min(int(raw_limit), 100))
+        except (TypeError, ValueError):
+            limit = 20
+        snapshots = list_quick_snapshots(limit=limit)
+        return web.json_response({"ok": True, "snapshots": snapshots})
+    except Exception as exc:
+        logger.exception("Snapshot listing failed")
+        return web.json_response({"ok": False, "error": str(exc)}, status=500)
+
+
+async def handle_snapshot_create(request: web.Request) -> web.Response:
+    """Create a quick state snapshot."""
+    try:
+        payload = await request.json() if request.can_read_body else {}
+    except Exception:
+        payload = {}
+
+    raw_label = payload.get("label")
+    label = str(raw_label).strip() if raw_label is not None else ""
+    label = label or None
+
+    try:
+        from hermes_cli.backup import create_quick_snapshot, list_quick_snapshots
+
+        snapshot_id = create_quick_snapshot(label=label)
+        if not snapshot_id:
+            return _json_error("No state files found to snapshot.", status=404)
+
+        snapshot = next((item for item in list_quick_snapshots(limit=50) if item.get("id") == snapshot_id), None)
+        return web.json_response({
+            "ok": True,
+            "snapshot_id": snapshot_id,
+            "snapshot": snapshot,
+            "message": f"Snapshot created: {snapshot_id}",
+        })
+    except Exception as exc:
+        logger.exception("Snapshot creation failed")
+        return web.json_response({"ok": False, "error": str(exc)}, status=500)
+
+
+async def handle_snapshot_restore(request: web.Request) -> web.Response:
+    """Restore state from a quick snapshot."""
+    try:
+        payload = await request.json() if request.can_read_body else {}
+    except Exception:
+        payload = {}
+
+    snapshot_id = str(payload.get("snapshot_id") or "").strip()
+    if not snapshot_id:
+        return _json_error("snapshot_id is required", status=400)
+
+    try:
+        from hermes_cli.backup import restore_quick_snapshot
+
+        restored = bool(restore_quick_snapshot(snapshot_id))
+        if not restored:
+            return _json_error(f"Snapshot not found: {snapshot_id}", status=404)
+        return web.json_response({
+            "ok": True,
+            "snapshot_id": snapshot_id,
+            "message": f"Restored snapshot {snapshot_id}. Restart recommended for state.db changes to take effect.",
+        })
+    except Exception as exc:
+        logger.exception("Snapshot restore failed")
+        return web.json_response({"ok": False, "error": str(exc)}, status=500)
+
+
+async def handle_snapshot_prune(request: web.Request) -> web.Response:
+    """Prune old quick snapshots while keeping the newest N."""
+    try:
+        payload = await request.json() if request.can_read_body else {}
+    except Exception:
+        payload = {}
+
+    raw_keep = payload.get("keep", 20)
+    try:
+        keep = max(1, min(int(raw_keep), 500))
+    except (TypeError, ValueError):
+        return _json_error("keep must be an integer", status=400)
+
+    try:
+        from hermes_cli.backup import prune_quick_snapshots
+
+        deleted = int(prune_quick_snapshots(keep=keep))
+        return web.json_response({
+            "ok": True,
+            "deleted": deleted,
+            "keep": keep,
+            "message": f"Pruned {deleted} old snapshot(s) (keeping {keep}).",
+        })
+    except Exception as exc:
+        logger.exception("Snapshot prune failed")
+        return web.json_response({"ok": False, "error": str(exc)}, status=500)
+
+
 async def handle_system_reload(request: web.Request) -> web.Response:
     """Reload ~/.hermes/.env into the running process environment."""
     try:
@@ -267,6 +373,10 @@ async def handle_system_restore(request: web.Request) -> web.Response:
 
 def register_system_api_routes(app: web.Application) -> None:
     """Register system backup/restore API routes."""
+    app.router.add_get("/api/gui/system/snapshots", handle_snapshot_list)
+    app.router.add_post("/api/gui/system/snapshots", handle_snapshot_create)
+    app.router.add_post("/api/gui/system/snapshots/restore", handle_snapshot_restore)
+    app.router.add_post("/api/gui/system/snapshots/prune", handle_snapshot_prune)
     app.router.add_post("/api/gui/system/reload", handle_system_reload)
     app.router.add_post("/api/gui/system/debug", handle_system_debug)
     app.router.add_get("/api/gui/system/backup", handle_system_backup)

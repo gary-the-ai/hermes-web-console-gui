@@ -21,7 +21,7 @@ A highly polished, modern web dashboard for **Hermes Agent**. The Web Console br
 - **Syntax Highlighting & Inline Diffs**: Unified, collapsible Git-style file diffs directly inside the chat interface letting you confidently review the agent's file modifications.
 - **Shared Command Registry**: The composer autocomplete is powered by the same slash-command registry as the Hermes CLI via `/api/gui/commands`.
 - **Command Browser**: A dedicated Commands page lets you browse canonical commands, aliases, usage hints, and parity badges (`Full`, `Partial`, `CLI only`).
-- **Browser-Native Slash Flows**: The chat interface now supports practical web versions of many CLI commands including `/queue`, `/branch`, `/resume`, `/save`, `/snapshot`, `/platforms`, `/image`, `/paste`, `/fast`, `/yolo`, `/reasoning`, `/verbose`, `/reload`, and `/debug`.
+- **Browser-Native Slash Flows**: The chat interface now supports practical web versions of many CLI commands including `/queue`, `/branch`, `/resume`, `/save`, `/snapshot` (list/create/restore/prune), `/platforms`, `/image`, `/paste`, `/fast`, `/yolo`, `/reasoning`, `/verbose`, `/reload`, and `/debug`.
 
 ## 🚀 Quick Start
 
@@ -57,7 +57,7 @@ The optimized static assets will populate the `/dist` directory automatically co
 
 The web console supports a large subset of Hermes slash commands directly inside chat. Highlights include:
 
-- **Session**: `/new`, `/retry`, `/undo`, `/branch`, `/resume`, `/queue`, `/save`, `/snapshot`
+- **Session**: `/new`, `/retry`, `/undo`, `/branch`, `/resume`, `/queue`, `/save`, `/snapshot` (list/create/restore/prune)
 - **Config**: `/model`, `/provider`, `/reasoning`, `/verbose`, `/fast`, `/yolo`, `/reload`
 - **Gateway/Admin**: `/platforms`, `/sethome`, `/restart`, `/update`, `/debug`
 - **Attachments**: `/image`, `/paste`

@@ -131,6 +131,33 @@ interface SystemDebugResponse {
   gateway_log?: string | null;
 }
 
+interface SnapshotEntry {
+  id: string;
+  label?: string | null;
+  file_count?: number;
+  total_size?: number;
+}
+
+interface SnapshotListResponse {
+  ok: boolean;
+  snapshots: SnapshotEntry[];
+}
+
+interface SnapshotCreateResponse {
+  ok: boolean;
+  snapshot_id?: string;
+  snapshot?: SnapshotEntry | null;
+  message?: string;
+}
+
+interface SnapshotActionResponse {
+  ok: boolean;
+  snapshot_id?: string;
+  deleted?: number;
+  keep?: number;
+  message?: string;
+}
+
 interface SessionUsageResponse {
   ok: boolean;
   session_usage?: {
@@ -742,31 +769,67 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
     }
 
     if (command === 'snapshot' || command === 'snap') {
+      const snapshotParts = args.split(/\s+/).filter(Boolean);
+      const snapshotSubcommand = (snapshotParts[0] || 'list').toLowerCase();
+
       try {
-        const base = getBackendUrl();
-        const res = await fetch(`${base}/api/gui/system/backup`);
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-          throw new Error(err.error || `HTTP ${res.status}`);
+        if (snapshotSubcommand === 'list' || snapshotSubcommand === 'ls') {
+          const res = await apiClient.get<SnapshotListResponse>('/system/snapshots?limit=20');
+          const lines = (res.snapshots || []).map((snapshot, index) => {
+            const size = Number(snapshot.total_size || 0);
+            const sizeText = size < 1024
+              ? `${size} B`
+              : size < 1024 * 1024
+                ? `${Math.round(size / 1024)} KB`
+                : `${(size / 1024 / 1024).toFixed(1)} MB`;
+            return `${index + 1}. ${snapshot.id} · ${snapshot.file_count ?? 0} file(s) · ${sizeText}${snapshot.label ? ` · ${snapshot.label}` : ''}`;
+          });
+          addSystemMessage(
+            lines.length
+              ? `Recent state snapshots:\n\n${lines.join('\n')}`
+              : 'No state snapshots yet. Use /snapshot create [label] to make one.',
+            'Snapshot',
+          );
+          return true;
         }
-        const blob = await res.blob();
-        const filename = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'hermes-backup.zip';
-        const fileCount = res.headers.get('X-Backup-Files') || '?';
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-          link.remove();
-        }, 1000);
-        dispatchUiModal('settings');
-        addSystemMessage(`Snapshot export started. Downloaded ${filename} with ${fileCount} file(s). Opened Settings so you can also restore backups.`, 'Snapshot');
+
+        if (snapshotSubcommand === 'create') {
+          const label = snapshotParts.slice(1).join(' ').trim();
+          const res = await apiClient.post<SnapshotCreateResponse>('/system/snapshots', label ? { label } : {});
+          addSystemMessage(
+            `${res.message || `Snapshot created: ${res.snapshot_id}`}${res.snapshot?.file_count != null ? `\n\nFiles captured: ${res.snapshot.file_count}` : ''}`,
+            'Snapshot',
+          );
+          return true;
+        }
+
+        if (snapshotSubcommand === 'restore' || snapshotSubcommand === 'rewind') {
+          const snapshotId = snapshotParts[1] || '';
+          if (!snapshotId) {
+            addSystemMessage('Usage: /snapshot restore <snapshot-id>', 'Snapshot');
+            return true;
+          }
+          const res = await apiClient.post<SnapshotActionResponse>('/system/snapshots/restore', { snapshot_id: snapshotId });
+          addSystemMessage(res.message || `Restored snapshot ${snapshotId}.`, 'Snapshot');
+          return true;
+        }
+
+        if (snapshotSubcommand === 'prune') {
+          const rawKeep = snapshotParts[1];
+          const keep = rawKeep ? Number(rawKeep) : 20;
+          if (!Number.isFinite(keep) || keep < 1) {
+            addSystemMessage('Usage: /snapshot prune [keep-count]', 'Snapshot');
+            return true;
+          }
+          const res = await apiClient.post<SnapshotActionResponse>('/system/snapshots/prune', { keep });
+          addSystemMessage(res.message || `Pruned ${res.deleted ?? 0} snapshot(s).`, 'Snapshot');
+          return true;
+        }
+
+        addSystemMessage('Usage: /snapshot [list|create [label]|restore <id>|prune [N]]', 'Snapshot');
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        addSystemMessage(`Snapshot export failed: ${msg}`, 'Error');
+        addSystemMessage(`Snapshot command failed: ${msg}`, 'Error');
       }
       return true;
     }

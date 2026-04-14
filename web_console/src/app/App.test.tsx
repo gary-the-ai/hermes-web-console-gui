@@ -155,6 +155,20 @@ describe('App shell', () => {
           { name: 'debug', description: 'Upload debug report and get shareable links', category: 'Info', aliases: [], names: ['debug'], args_hint: '[share|local]', subcommands: [], cli_only: false, gateway_only: false }
         ] }), { status: 200 });
       }
+      if (url.includes('/api/gui/system/snapshots') && url.includes('limit=')) {
+        return new Response(JSON.stringify({ ok: true, snapshots: [
+          { id: 'snap-2', label: 'before-upgrade', file_count: 4, total_size: 2048 },
+        ] }), { status: 200 });
+      }
+      if (url.endsWith('/api/gui/system/snapshots')) {
+        return new Response(JSON.stringify({ ok: true, snapshot_id: 'snap-3', snapshot: { id: 'snap-3', label: 'pre-upgrade', file_count: 5, total_size: 4096 } }), { status: 200 });
+      }
+      if (url.includes('/api/gui/system/snapshots/restore')) {
+        return new Response(JSON.stringify({ ok: true, snapshot_id: 'snap-2', message: 'Restored snapshot snap-2. Restart recommended for state.db changes to take effect.' }), { status: 200 });
+      }
+      if (url.includes('/api/gui/system/snapshots/prune')) {
+        return new Response(JSON.stringify({ ok: true, deleted: 3, keep: 5, message: 'Pruned 3 old snapshot(s) (keeping 5).' }), { status: 200 });
+      }
       if (url.includes('/api/gui/system/reload')) {
         return new Response(JSON.stringify({ ok: true, updated: 2, message: 'Reloaded .env (2 var(s) updated)' }), { status: 200 });
       }
@@ -311,23 +325,50 @@ describe('App shell', () => {
     expect(screen.getByRole('button', { name: 'tools' }).className).toContain('panel-tab-active');
   });
 
-  it('runs /snapshot, /reload, and /debug slash commands in chat', async () => {
+  it('runs richer /snapshot subcommands in chat', async () => {
     render(<App />);
 
     const prompt = screen.getByPlaceholderText(/Message Hermes.../i);
     const composer = screen.getByLabelText('Composer');
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
-    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     await act(async () => {
       fireEvent.change(prompt, { target: { value: '/snapshot' } });
       fireEvent.submit(composer);
     });
-
     await waitFor(() => {
-      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/system/backup'))).toBe(true);
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/system/snapshots?limit=20'))).toBe(true);
     });
-    expect(openSpy).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/snapshot create pre-upgrade' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).endsWith('/api/gui/system/snapshots'))).toBe(true);
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/snapshot restore snap-2' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/system/snapshots/restore'))).toBe(true);
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/snapshot prune 5' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/system/snapshots/prune'))).toBe(true);
+    });
+  });
+
+  it('runs /reload and /debug slash commands in chat', async () => {
+    render(<App />);
+
+    const prompt = screen.getByPlaceholderText(/Message Hermes.../i);
+    const composer = screen.getByLabelText('Composer');
 
     await act(async () => {
       fireEvent.change(prompt, { target: { value: '/reload' } });
@@ -346,8 +387,6 @@ describe('App shell', () => {
     await waitFor(() => {
       expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/system/debug'))).toBe(true);
     });
-    anchorClick.mockRestore();
-    openSpy.mockRestore();
   });
 
   it('opens the command palette and prefills slash commands into chat', async () => {

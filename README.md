@@ -132,9 +132,15 @@ The web console now covers most of the high-value Hermes slash command surface i
 - operational controls like `/platforms`, `/sethome`, `/restart`, `/update`, `/debug`
 - browser-native attachment helpers like `/image` and `/paste`
 
+`/snapshot` now supports the core CLI subcommands directly in chat:
+- `/snapshot` or `/snapshot list`
+- `/snapshot create [label]`
+- `/snapshot restore <id>`
+- `/snapshot prune [N]`
+
 Some commands remain intentionally partial because browser UX differs from terminal UX:
 
-- `/config`, `/history`, `/usage`, `/platforms`, `/voice`, `/update`, `/restart`, `/snapshot`, `/debug`
+- `/config`, `/history`, `/usage`, `/platforms`, `/voice`, `/update`, `/restart`, `/debug`
 
 And a few commands are still effectively CLI-only by nature:
 
@@ -168,10 +174,10 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 ## 📜 Changelog
 
 ### [2026.4.14] - Upstream Command Parity Follow-up
-- **Snapshot Command Parity**: Added web-native `/snapshot` and `/snap` handling that triggers a Hermes backup export in chat and routes users to the Settings restore surface for follow-up recovery actions.
+- **Stronger Snapshot Parity**: Upgraded `/snapshot` and `/snap` from a simple export shortcut into a richer chat flow covering list, create, restore, and prune subcommands backed by dedicated snapshot APIs.
 - **Runtime Reload Command**: Added `/reload` support backed by a new `POST /api/gui/system/reload` endpoint that re-reads `~/.hermes/.env` into the running process and reports how many variables changed.
 - **Debug Report Command**: Added `/debug` chat support backed by `POST /api/gui/system/debug`, returning paste links for uploaded debug bundles or inline local output for `/debug local`.
-- **Command Browser Refresh**: Updated command parity badges so `/reload` is marked **Full** while `/snapshot` and `/debug` are clearly marked **Partial** web-native equivalents.
+- **Command Browser Refresh**: Updated command parity badges so `/reload` and `/snapshot` are marked **Full** while `/debug` remains a clearly marked **Partial** web-native equivalent.
 - **Coverage Expansion**: Added backend system API tests and frontend App-shell slash tests covering the new command parity flows.
 
 ### [2026.4.13] - Universal CLI Command Parity Integrations
