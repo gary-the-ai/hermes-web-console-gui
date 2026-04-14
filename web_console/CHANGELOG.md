@@ -7,6 +7,7 @@ All notable changes to the Hermes Web Console will be documented in this file.
 ### Added
 - **Stronger Snapshot Parity**: Upgraded `/snapshot` and `/snap` from a backup-export shortcut into a richer web-console flow with list, create, restore, and prune subcommands backed by dedicated snapshot APIs.
 - **Chat Command Parity Cleanup**: Added web-chat parity for `/title`, `/rollback`, `/fork`, and `/reload_mcp`, closing the remaining slash-command gaps for session renaming, checkpoint restore, branch aliasing, and MCP reloads.
+- **Browser-Native Session Controls**: Added web-native `/statusbar` and `/sb` handling to toggle the in-chat run/usage status bar, plus explicit `/quit` and `/exit` guidance and smart `/q` alias behavior in chat.
 - **Snapshot API Surface**: Added `/api/gui/system/snapshots`, `/api/gui/system/snapshots/restore`, and `/api/gui/system/snapshots/prune` so the browser can manage Hermes quick state snapshots directly.
 - **Snapshot / Reload / Debug Parity**: Added web-console support for `/snapshot`, `/reload`, and `/debug`, including an in-process `.env` reload route and debug-report upload/local-output route.
 - **System API Coverage**: Added dedicated backend tests for the new snapshot endpoints plus `/api/gui/system/reload` and `/api/gui/system/debug`, along with frontend chat-command coverage in `App.test.tsx`.

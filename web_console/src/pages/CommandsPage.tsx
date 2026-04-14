@@ -29,11 +29,11 @@ const FULLY_SUPPORTED = new Set([
   'model', 'provider', 'personality', 'verbose', 'yolo', 'reasoning',
   'fast', 'skin', 'tools', 'toolsets', 'skills', 'cron', 'reload', 'reload-mcp', 'reload_mcp',
   'browser', 'commands', 'help', 'usage', 'insights', 'save', 'image', 'paste',
-  'reset', 'bg', 'snapshot', 'snap'
+  'reset', 'bg', 'snapshot', 'snap', 'statusbar', 'sb'
 ]);
 
 const PARTIALLY_SUPPORTED = new Set([
-  'clear', 'statusbar', 'quit', 'exit', 'q',
+  'clear', 'quit', 'exit', 'q',
   'config', 'history', 'platforms', 'gateway', 'sethome', 'set-home',
   'voice', 'update', 'restart', 'debug'
 ]);

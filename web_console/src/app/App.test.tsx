@@ -452,6 +452,55 @@ describe('App shell', () => {
     });
   });
 
+  it('runs /statusbar, /sb, /quit, /exit, and /q slash commands in chat', async () => {
+    render(<App />);
+
+    const prompt = screen.getByPlaceholderText(/Message Hermes.../i);
+    const composer = screen.getByLabelText('Composer');
+
+    expect(screen.getByLabelText('Run status')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/statusbar off' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Run status')).not.toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/sb on' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText('Run status')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/quit' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/close the browser tab/i)).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/exit' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect(screen.getAllByText(/close the browser tab/i).length).toBeGreaterThan(0);
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/q queued from alias' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/No active run — sending queued prompt immediately/i)).toBeInTheDocument();
+    });
+  });
+
   it('opens the command palette and prefills slash commands into chat', async () => {
     render(<App />);
 

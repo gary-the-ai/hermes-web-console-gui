@@ -182,6 +182,17 @@ interface SessionUsageResponse {
 }
 
 const DEFAULT_ITEMS: TranscriptItem[] = [];
+const CHAT_STATUSBAR_STORAGE_KEY = 'hermes-chat-statusbar-visible';
+
+function readInitialStatusBarVisible(): boolean {
+  try {
+    const stored = window.localStorage.getItem(CHAT_STATUSBAR_STORAGE_KEY);
+    if (stored == null) return true;
+    return stored !== 'false';
+  } catch {
+    return true;
+  }
+}
 
 function mapGuiEventToTranscriptItem(event: GuiEvent): TranscriptItem | null {
   const { type, payload } = event;
@@ -226,6 +237,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
   const [reasoningEffort, setReasoningEffort] = useState<string>('none');
   const [showReasoning, setShowReasoning] = useState(false);
   const [toolProgressMode, setToolProgressMode] = useState<'off' | 'new' | 'all' | 'verbose'>('all');
+  const [showStatusBar, setShowStatusBar] = useState<boolean>(() => readInitialStatusBarVisible());
   const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
   const subscriptionRef = useRef<{ close(): void } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -254,7 +266,15 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
     setQueuedPrompt(value);
   };
 
-  const dispatchUiRoute = (route: 'chat' | 'sessions' | 'workspace' | 'usage' | 'jobs' | 'skills' | 'memory' | 'missions') => {
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CHAT_STATUSBAR_STORAGE_KEY, String(showStatusBar));
+    } catch {
+      // ignore persistence failures
+    }
+  }, [showStatusBar]);
+
+  const dispatchUiRoute = (route: 'chat' | 'sessions' | 'workspace' | 'usage' | 'jobs' | 'skills' | 'memory' | 'missions' | 'commands') => {
     window.dispatchEvent(new CustomEvent('hermes:navigate', { detail: { route } }));
     window.location.hash = `#/${route}`;
   };
@@ -689,7 +709,35 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
       return true;
     }
 
-    if (command === 'queue') {
+    if (command === 'quit' || command === 'exit' || (command === 'q' && !args)) {
+      addSystemMessage(
+        'Hermes Web Console cannot terminate the browser tab directly. Close the browser tab/window if you want to leave the console, or use /new to reset the current chat.',
+        'Quit',
+      );
+      return true;
+    }
+
+    if (command === 'statusbar' || command === 'sb') {
+      let nextVisible = showStatusBar;
+      if (!args || args === 'toggle') {
+        nextVisible = !showStatusBar;
+      } else if (['on', 'show'].includes(args)) {
+        nextVisible = true;
+      } else if (['off', 'hide'].includes(args)) {
+        nextVisible = false;
+      } else if (args === 'status') {
+        addSystemMessage(`Status bar: ${showStatusBar ? 'visible' : 'hidden'}`, 'Status Bar');
+        return true;
+      } else {
+        addSystemMessage('Usage: /statusbar [on|off|toggle|status]', 'Status Bar');
+        return true;
+      }
+      setShowStatusBar(nextVisible);
+      addSystemMessage(`Status bar ${nextVisible ? 'shown' : 'hidden'}.`, 'Status Bar');
+      return true;
+    }
+
+    if (command === 'queue' || (command === 'q' && Boolean(args))) {
       if (!args) {
         addSystemMessage('Usage: /queue <prompt>', 'Queue');
         return true;
@@ -1212,12 +1260,6 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
       return true;
     }
 
-    if (command === 'platforms' || command === 'gateway') {
-      dispatchUiModal('gateway');
-      addSystemMessage('Opened Messaging Gateway controls.', 'Navigation');
-      return true;
-    }
-
     if (command === 'cron') {
       dispatchUiModal('automations');
       addSystemMessage('Opened Automations (Cron).', 'Navigation');
@@ -1572,6 +1614,11 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
            ☰
         </button>
         <div className="chat-main-column" style={{ paddingLeft: '48px', minWidth: 0 }}>
+          {showStatusBar && (
+            <div style={{ padding: '16px 20px 0' }}>
+              <RunStatusBar status={runStatus} sessionId={sessionId} />
+            </div>
+          )}
           <Transcript items={items} sessionId={sessionId} onBranch={handleBranch} />
           <div ref={scrollRef} />
 
@@ -1678,7 +1725,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
           apiClient.patch('/settings', { agent: { reasoning_effort: val } }).catch(() => {});
         }}
         />
-        <UsageBar usage={usageData} />
+        {showStatusBar && <UsageBar usage={usageData} />}
       </div>
       {toolEvents.length > 0 && (
         <div style={{ minWidth: 0, paddingRight: '12px', paddingTop: '56px' }}>
