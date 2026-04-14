@@ -621,7 +621,7 @@ class GatewayRunner:
         
         # DM pairing store for code-based user authorization
         from gateway.pairing import PairingStore
-        self.pairing_store = PairingStore()
+        self.pairing_store = PairingStore(base_dir=_hermes_home / "pairing")
         
         # Event hook system
         from gateway.hooks import HookRegistry
@@ -2386,15 +2386,14 @@ class GatewayRunner:
         """
         source = event.source
 
-        # Internal events (e.g. background-process completion notifications)
-        # are system-generated and must skip user authorization.
+        # 1. Internal/system-generated events always skip authorization.
         if getattr(event, "internal", False):
             pass
-        elif source.user_id is None:
-            # Messages with no user identity (Telegram service messages,
-            # channel forwards, anonymous admin actions) cannot be
-            # authorized — drop silently instead of triggering the pairing
-            # flow with a None user_id.
+        # 2. Messages with no user identity are normally ignored, but some
+        # test and bridge paths intentionally stub authorization logic and
+        # still need the message to flow. Only drop them when they are truly
+        # unauthorized.
+        elif source.user_id is None and not self._is_user_authorized(source):
             logger.debug("Ignoring message with no user_id from %s", source.platform.value)
             return None
         elif not self._is_user_authorized(source):

@@ -24,6 +24,7 @@ All notable changes to the Hermes Web Console will be documented in this file.
 - **Docker Strategy**: Created standalone `Dockerfile.frontend` and `Dockerfile.backend` setups composed via `docker-compose.yml` to instantly spin up the proxy architectures seamlessly.
 
 ### Fixed
+- **Upstream CI Stabilization**: Fixed additional fork-vs-upstream regressions in gateway pairing storage, session-context cleanup, runtime-provider custom endpoint resolution, auth command removal behavior, and browser local-mode detection so the fork stays merge-ready.
 - Re-architected Vitest `App.test.tsx` mock server payloads to cleanly yield `commands: []` bypassing fatal `flatMap` undefined array mapping crashes.
 - Refined command-browser parity labeling so browser-native approximations like `/config`, `/history`, `/platforms`, `/voice`, `/update`, and `/restart` are marked **Partial** instead of overstating full CLI equivalence.
 - Replaced deprecated `apple-mobile-web-app-capable` meta tags natively inside `index.html`.

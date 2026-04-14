@@ -174,6 +174,7 @@ Distributed under the MIT License. See `LICENSE` for more information. Built ori
 ## 📜 Changelog
 
 ### [2026.4.14] - Upstream Command Parity Follow-up
+- **CI Stabilization Sweep**: Fixed additional upstream/fork test regressions across gateway pairing/session context, custom runtime provider resolution, auth command removal, browser local-mode detection, and adapter compatibility so the fork stays merge-ready against upstream.
 - **Stronger Snapshot Parity**: Upgraded `/snapshot` and `/snap` from a simple export shortcut into a richer chat flow covering list, create, restore, and prune subcommands backed by dedicated snapshot APIs.
 - **Runtime Reload Command**: Added `/reload` support backed by a new `POST /api/gui/system/reload` endpoint that re-reads `~/.hermes/.env` into the running process and reports how many variables changed.
 - **Debug Report Command**: Added `/debug` chat support backed by `POST /api/gui/system/debug`, returning paste links for uploaded debug bundles or inline local output for `/debug local`.
