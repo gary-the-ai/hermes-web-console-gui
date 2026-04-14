@@ -78,6 +78,17 @@ def set_session_context(session_id: str) -> None:
     _session_context.session_id = session_id
 
 
+def clear_session_context() -> None:
+    """Clear the session ID for the current thread.
+
+    Call this when done with a conversation to stop including the session
+    tag in log output on this thread.
+    """
+    try:
+        delattr(_session_context, "session_id")
+    except AttributeError:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # Record factory — injects session_tag into every LogRecord at creation
