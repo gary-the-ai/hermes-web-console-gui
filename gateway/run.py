@@ -6985,8 +6985,14 @@ class GatewayRunner:
 
     def _clear_session_env(self, tokens: list) -> None:
         """Restore session context variables to their pre-handler values."""
+        import os
         from gateway.session_context import clear_session_vars
         clear_session_vars(tokens)
+        # Gateway code may temporarily mirror the session key into os.environ as a
+        # legacy fallback for code paths that haven't migrated to contextvars.
+        # Clear the process-global fallback when the request completes so stale
+        # values don't leak into later tests or unrelated sessions.
+        os.environ.pop("HERMES_SESSION_KEY", None)
     
     async def _enrich_message_with_vision(
         self,

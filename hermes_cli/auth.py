@@ -769,15 +769,19 @@ def is_provider_explicitly_configured(provider_id: str) -> bool:
     except Exception:
         pass
 
-    # 2. Check config.yaml model.provider
+    # 2. Check config.yaml model.provider, but only if the user actually has a
+    # config file on disk. Falling back to DEFAULT_CONFIG would incorrectly mark
+    # the default provider as explicitly configured.
     try:
-        from hermes_cli.config import load_config
-        cfg = load_config()
-        model_cfg = cfg.get("model")
-        if isinstance(model_cfg, dict):
-            cfg_provider = (model_cfg.get("provider") or "").strip().lower()
-            if cfg_provider == normalized:
-                return True
+        from hermes_cli.config import get_config_path, load_config
+        config_path = get_config_path()
+        if config_path.exists():
+            cfg = load_config()
+            model_cfg = cfg.get("model")
+            if isinstance(model_cfg, dict):
+                cfg_provider = (model_cfg.get("provider") or "").strip().lower()
+                if cfg_provider == normalized:
+                    return True
     except Exception:
         pass
 
