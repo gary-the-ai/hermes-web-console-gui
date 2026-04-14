@@ -233,7 +233,21 @@ def _get_cdp_override() -> str:
     When ``BROWSER_CDP_URL`` is set (e.g. via ``/browser connect``), we skip
     both Browserbase and the local headless launcher and connect directly to
     the supplied Chrome DevTools Protocol endpoint.
+
+    An explicit ``browser.cloud_provider: local`` config disables CDP override
+    fallback so tests and user config can force true local mode even when a
+    stale BROWSER_CDP_URL remains in the environment.
     """
+    try:
+        from hermes_cli.config import read_raw_config
+        cfg = read_raw_config()
+        browser_cfg = cfg.get("browser", {}) if isinstance(cfg, dict) else {}
+        if isinstance(browser_cfg, dict):
+            provider_key = normalize_browser_cloud_provider(browser_cfg.get("cloud_provider"))
+            if provider_key == "local":
+                return ""
+    except Exception:
+        pass
     return _resolve_cdp_override(os.environ.get("BROWSER_CDP_URL", ""))
 
 
@@ -309,7 +323,7 @@ def _browser_install_hint() -> str:
 
 
 def _requires_real_termux_browser_install(browser_cmd: str) -> bool:
-    return _is_termux_environment() and _is_local_mode() and browser_cmd.strip() == "npx agent-browser"
+    return _is_termux_environment() and _get_cloud_provider() is None and browser_cmd.strip() == "npx agent-browser"
 
 
 def _termux_browser_install_error() -> str:
