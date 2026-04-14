@@ -152,6 +152,10 @@ describe('App shell', () => {
           { name: 'queue', description: 'Queue a prompt for the next turn', category: 'Session', aliases: ['q'], names: ['queue', 'q'], args_hint: '<prompt>', subcommands: [], cli_only: false, gateway_only: false },
           { name: 'snapshot', description: 'Create or restore state snapshots of Hermes config/state', category: 'Session', aliases: ['snap'], names: ['snapshot', 'snap'], args_hint: '[create|restore <id>|prune]', subcommands: [], cli_only: false, gateway_only: false },
           { name: 'reload', description: 'Reload .env variables into the running session', category: 'Tools & Skills', aliases: [], names: ['reload'], args_hint: '', subcommands: [], cli_only: false, gateway_only: false },
+          { name: 'reload-mcp', description: 'Reload MCP servers from config', category: 'Tools & Skills', aliases: ['reload_mcp'], names: ['reload-mcp', 'reload_mcp'], args_hint: '', subcommands: [], cli_only: false, gateway_only: false },
+          { name: 'title', description: 'Set a title for the current session', category: 'Session', aliases: [], names: ['title'], args_hint: '<title>', subcommands: [], cli_only: false, gateway_only: false },
+          { name: 'rollback', description: 'List or restore filesystem checkpoints', category: 'Session', aliases: [], names: ['rollback'], args_hint: '[checkpoint_id]', subcommands: [], cli_only: false, gateway_only: false },
+          { name: 'branch', description: 'Branch the current session', category: 'Session', aliases: ['fork'], names: ['branch', 'fork'], args_hint: '[name]', subcommands: [], cli_only: false, gateway_only: false },
           { name: 'debug', description: 'Upload debug report and get shareable links', category: 'Info', aliases: [], names: ['debug'], args_hint: '[share|local]', subcommands: [], cli_only: false, gateway_only: false }
         ] }), { status: 200 });
       }
@@ -174,6 +178,9 @@ describe('App shell', () => {
       }
       if (url.includes('/api/gui/system/debug')) {
         return new Response(JSON.stringify({ ok: true, mode: 'upload', report_url: 'https://paste.test/report', agent_log_url: 'https://paste.test/agent', gateway_log_url: null, failures: [] }), { status: 200 });
+      }
+      if (url.includes('/api/gui/mcp/reload')) {
+        return new Response(JSON.stringify({ ok: true, reloaded: true }), { status: 200 });
       }
       if (url.includes('/api/gui/system/backup')) {
         return new Response('backup-bytes', {
@@ -386,6 +393,62 @@ describe('App shell', () => {
 
     await waitFor(() => {
       expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/system/debug'))).toBe(true);
+    });
+  });
+
+  it('runs /title, /rollback, /fork, and /reload_mcp slash commands in chat', async () => {
+    render(<App />);
+
+    const prompt = screen.getByPlaceholderText(/Message Hermes.../i);
+    const composer = screen.getByLabelText('Composer');
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: 'Hello from test' } });
+      fireEvent.submit(composer);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Hermes is thinking/i)).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/title Renamed Session' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/sessions/session-live/title'))).toBe(true);
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/rollback' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.filter((call: any[]) => String(call[0]).includes('/api/gui/workspace/checkpoints')).length).toBeGreaterThan(0);
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/rollback cp-1' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/workspace/rollback'))).toBe(true);
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/fork Experimental branch' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/sessions/session-live/branch'))).toBe(true);
+    });
+
+    await act(async () => {
+      fireEvent.change(prompt, { target: { value: '/reload_mcp' } });
+      fireEvent.submit(composer);
+    });
+    await waitFor(() => {
+      expect((global.fetch as any).mock.calls.some((call: any[]) => String(call[0]).includes('/api/gui/mcp/reload'))).toBe(true);
     });
   });
 

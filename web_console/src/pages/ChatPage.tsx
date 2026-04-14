@@ -158,6 +158,17 @@ interface SnapshotActionResponse {
   message?: string;
 }
 
+interface WorkspaceCheckpointResponse {
+  ok: boolean;
+  checkpoints?: Array<{ checkpoint_id?: string; label?: string }>;
+}
+
+interface WorkspaceRollbackResponse {
+  ok: boolean;
+  checkpoint_id?: string;
+  message?: string;
+}
+
 interface SessionUsageResponse {
   ok: boolean;
   session_usage?: {
@@ -768,6 +779,52 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
       return true;
     }
 
+    if (command === 'title') {
+      if (!args) {
+        addSystemMessage('Usage: /title <new session title>', 'Title');
+        return true;
+      }
+      if (sessionId === 'current') {
+        addSystemMessage('No active saved session yet. Send a message first, then try /title again.', 'Title');
+        return true;
+      }
+      try {
+        await apiClient.post(`/sessions/${encodeURIComponent(sessionId)}/title`, { title: args });
+        addSystemMessage(`🏷️ Session renamed to "${args}".`, 'Title');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Title update failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'rollback') {
+      try {
+        if (!args) {
+          const res = await apiClient.get<WorkspaceCheckpointResponse>('/workspace/checkpoints');
+          const lines = (res.checkpoints || []).map((checkpoint, index) => {
+            const id = checkpoint.checkpoint_id || 'unknown';
+            const label = checkpoint.label || id;
+            return `${index + 1}. ${label} (${id})`;
+          });
+          addSystemMessage(
+            lines.length
+              ? `Workspace checkpoints:\n\n${lines.join('\n')}\n\nUse /rollback <checkpoint_id> to restore one.`
+              : 'No workspace checkpoints are available right now.',
+            'Rollback',
+          );
+          return true;
+        }
+
+        const res = await apiClient.post<WorkspaceRollbackResponse>('/workspace/rollback', { checkpoint_id: args });
+        addSystemMessage(res.message || `↩ Rolled workspace back to ${args}.`, 'Rollback');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`Rollback failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
     if (command === 'snapshot' || command === 'snap') {
       const snapshotParts = args.split(/\s+/).filter(Boolean);
       const snapshotSubcommand = (snapshotParts[0] || 'list').toLowerCase();
@@ -841,6 +898,24 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         addSystemMessage(`Reload failed: ${msg}`, 'Error');
+      }
+      return true;
+    }
+
+    if (command === 'reload-mcp' || command === 'reload_mcp') {
+      try {
+        const res = await apiClient.post<{ success?: boolean; reloaded?: boolean; tools_count?: number; servers_count?: number }>('/mcp/reload', {});
+        if (res.success === false) {
+          addSystemMessage('MCP reload was rejected by the backend.', 'MCP');
+        } else {
+          addSystemMessage(
+            `🔌 Reloaded MCP servers${res.servers_count != null ? ` (${res.servers_count} server(s)` : ''}${res.tools_count != null ? `${res.servers_count != null ? ', ' : ' ('}${res.tools_count} tool(s)` : ''}${res.servers_count != null || res.tools_count != null ? ')' : ''}.`,
+            'MCP',
+          );
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addSystemMessage(`MCP reload failed: ${msg}`, 'Error');
       }
       return true;
     }
@@ -1026,7 +1101,7 @@ export function ChatPage({ voiceMode }: { voiceMode?: boolean }) {
       return true;
     }
 
-    if (command === 'branch') {
+    if (command === 'branch' || command === 'fork') {
       if (sessionId === 'current') {
         addSystemMessage('No active saved session to branch yet. Send a message first, then try /branch again.', 'Branch');
         return true;

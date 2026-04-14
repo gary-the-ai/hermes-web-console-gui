@@ -24,10 +24,10 @@ interface CommandsResponse {
 type ParityStatus = 'full' | 'partial' | 'cli_only';
 
 const FULLY_SUPPORTED = new Set([
-  'new', 'retry', 'undo', 'title', 'branch', 'compress', 'rollback', 'stop',
+  'new', 'retry', 'undo', 'title', 'branch', 'fork', 'compress', 'rollback', 'stop',
   'approve', 'deny', 'background', 'btw', 'queue', 'status', 'profile', 'resume',
   'model', 'provider', 'personality', 'verbose', 'yolo', 'reasoning',
-  'fast', 'skin', 'tools', 'toolsets', 'skills', 'cron', 'reload', 'reload-mcp',
+  'fast', 'skin', 'tools', 'toolsets', 'skills', 'cron', 'reload', 'reload-mcp', 'reload_mcp',
   'browser', 'commands', 'help', 'usage', 'insights', 'save', 'image', 'paste',
   'reset', 'bg', 'snapshot', 'snap'
 ]);
