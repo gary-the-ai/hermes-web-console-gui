@@ -13,11 +13,14 @@ def _ensure_discord_mock():
     if "discord" in sys.modules and hasattr(sys.modules["discord"], "__file__"):
         return
 
-    discord_mod = MagicMock()
+    discord_mod = sys.modules.get("discord")
+    if discord_mod is None or hasattr(discord_mod, "__file__"):
+        discord_mod = MagicMock()
+        sys.modules["discord"] = discord_mod
     discord_mod.Intents.default.return_value = MagicMock()
-    discord_mod.DMChannel = type("DMChannel", (), {})
-    discord_mod.Thread = type("Thread", (), {})
-    discord_mod.ForumChannel = type("ForumChannel", (), {})
+    discord_mod.DMChannel = getattr(discord_mod, "DMChannel", type("DMChannel", (), {}))
+    discord_mod.Thread = getattr(discord_mod, "Thread", type("Thread", (), {}))
+    discord_mod.ForumChannel = getattr(discord_mod, "ForumChannel", type("ForumChannel", (), {}))
     discord_mod.Interaction = object
 
     # Lightweight mock for app_commands.Group and Command used by
@@ -49,19 +52,64 @@ def _ensure_discord_mock():
         Command=_FakeCommand,
     )
 
-    ext_mod = MagicMock()
-    commands_mod = MagicMock()
+    ext_mod = sys.modules.get("discord.ext") or MagicMock()
+    commands_mod = sys.modules.get("discord.ext.commands") or MagicMock()
     commands_mod.Bot = MagicMock
     ext_mod.commands = commands_mod
 
-    sys.modules.setdefault("discord", discord_mod)
-    sys.modules.setdefault("discord.ext", ext_mod)
-    sys.modules.setdefault("discord.ext.commands", commands_mod)
+    sys.modules["discord.ext"] = ext_mod
+    sys.modules["discord.ext.commands"] = commands_mod
 
 
 _ensure_discord_mock()
 
 from gateway.platforms.discord import DiscordAdapter  # noqa: E402
+
+
+def _refresh_adapter_discord_stubs() -> None:
+    """Reinstall app_commands stubs on the adapter's imported discord module.
+
+    Full-suite import order can mutate the shared mock after this module is
+    imported. Refresh it before each adapter is created so the code under test
+    always sees Command/Group.
+    """
+    discord_mod = sys.modules["discord"]
+
+    class _FakeGroup:
+        def __init__(self, *, name, description, parent=None):
+            self.name = name
+            self.description = description
+            self.parent = parent
+            self._children = {}
+            if parent is not None:
+                parent.add_command(self)
+
+        def add_command(self, cmd):
+            self._children[cmd.name] = cmd
+
+    class _FakeCommand:
+        def __init__(self, *, name, description, callback, parent=None):
+            self.name = name
+            self.description = description
+            self.callback = callback
+            self.parent = parent
+
+    app_commands = SimpleNamespace(
+        describe=lambda **kwargs: (lambda fn: fn),
+        choices=lambda **kwargs: (lambda fn: fn),
+        Choice=lambda **kwargs: SimpleNamespace(**kwargs),
+        Group=_FakeGroup,
+        Command=_FakeCommand,
+    )
+    discord_mod.app_commands = app_commands
+    import gateway.platforms.discord as discord_platform
+
+    # Rebind the adapter to the shared discord mock module itself so later
+    # tests keep access to the full mocked surface (e.g. File for uploads)
+    # instead of a narrowed proxy with only slash-command attributes.
+    discord_platform.discord = discord_mod
+    DiscordAdapter._register_slash_commands.__globals__["discord"] = discord_mod
+    DiscordAdapter._register_skill_group.__globals__["discord"] = discord_mod
 
 
 class FakeTree:
@@ -84,6 +132,7 @@ class FakeTree:
 
 @pytest.fixture
 def adapter():
+    _refresh_adapter_discord_stubs()
     config = PlatformConfig(enabled=True, token="***")
     adapter = DiscordAdapter(config)
     adapter._client = SimpleNamespace(
@@ -93,6 +142,13 @@ def adapter():
         user=SimpleNamespace(id=99999, name="HermesBot"),
     )
     adapter._text_batch_delay_seconds = 0  # disable batching for tests
+    original_register = adapter._register_slash_commands
+
+    def _wrapped_register(*args, **kwargs):
+        _refresh_adapter_discord_stubs()
+        return original_register(*args, **kwargs)
+
+    adapter._register_slash_commands = _wrapped_register
     return adapter
 
 
@@ -671,4 +727,3 @@ def test_register_skill_group_handler_dispatches_command(adapter):
     assert gif_cmd.callback is not None
     # The callback name should reflect the skill
     assert "gif_search" in gif_cmd.callback.__name__
-

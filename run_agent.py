@@ -7486,12 +7486,14 @@ class AIAgent:
                     self.tool_progress_callback("tool.started", name, preview, args)
                 except Exception as cb_err:
                     logging.debug(f"Tool progress callback error: {cb_err}")
-            self._emit_gui_event(
-                "tool.started",
-                tool_name=name,
-                tool_args=args,
-                preview=preview,
-            )
+            emit_gui_event = getattr(self, "_emit_gui_event", None)
+            if callable(emit_gui_event):
+                emit_gui_event(
+                    "tool.started",
+                    tool_name=name,
+                    tool_args=args,
+                    preview=preview,
+                )
 
         for tc, name, args in parsed_calls:
             if self.tool_start_callback:
@@ -7664,14 +7666,16 @@ class AIAgent:
             if subdir_hints:
                 function_result += subdir_hints
 
-            self._emit_gui_event(
-                "tool.completed",
-                tool_name=function_name,
-                tool_args=function_args,
-                duration=tool_duration,
-                result_preview=function_result[:200] if len(function_result) > 200 else function_result,
-                is_error=is_error,
-            )
+            emit_gui_event = getattr(self, "_emit_gui_event", None)
+            if callable(emit_gui_event):
+                emit_gui_event(
+                    "tool.completed",
+                    tool_name=function_name,
+                    tool_args=function_args,
+                    duration=tool_duration,
+                    result_preview=function_result[:200] if len(function_result) > 200 else function_result,
+                    is_error=is_error,
+                )
 
             # Append tool result message in order
             tool_msg = {
