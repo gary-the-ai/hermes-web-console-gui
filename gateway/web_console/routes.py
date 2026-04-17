@@ -12,7 +12,7 @@ from aiohttp import web
 from .api import register_web_console_api_routes
 from .sse import SseMessage, stream_sse
 from .state import get_web_console_state
-from .static import get_web_console_placeholder_html
+from . import static as web_console_static
 
 ADAPTER_APP_KEY = web.AppKey("hermes_web_console_adapter", object)
 
@@ -43,11 +43,50 @@ async def handle_gui_meta(request: web.Request) -> web.Response:
 
 
 async def handle_app_root(request: web.Request) -> web.Response:
-    """Serve a simple placeholder page for the future web console frontend."""
+    """Serve the web console SPA shell."""
     return web.Response(
-        text=get_web_console_placeholder_html(),
+        text=web_console_static.get_web_console_app_html(),
         content_type="text/html",
     )
+
+
+async def handle_app_redirect(request: web.Request) -> web.StreamResponse:
+    """Redirect /app to the canonical trailing-slash SPA mount."""
+    raise web.HTTPFound("/app/")
+
+
+async def handle_app_manifest(request: web.Request) -> web.Response:
+    """Serve the PWA manifest for the mounted GUI app."""
+    manifest = web_console_static.get_web_console_manifest_json()
+    if manifest is None:
+        raise web.HTTPNotFound(text="manifest.json not found")
+    return web.Response(text=manifest, content_type="application/manifest+json")
+
+
+async def handle_app_service_worker(request: web.Request) -> web.Response:
+    """Serve the service worker for the mounted GUI app."""
+    service_worker = web_console_static.get_web_console_service_worker()
+    if service_worker is None:
+        raise web.HTTPNotFound(text="sw.js not found")
+    return web.Response(text=service_worker, content_type="application/javascript")
+
+
+async def handle_app_asset(request: web.Request) -> web.StreamResponse:
+    """Serve built frontend assets from web_console/dist/assets."""
+    rel_path = request.match_info["tail"]
+    asset_path = web_console_static.get_web_console_dist_dir() / "assets" / rel_path
+    if not asset_path.is_file():
+        raise web.HTTPNotFound(text=f"asset not found: {rel_path}")
+    return web.FileResponse(asset_path)
+
+
+async def handle_app_icon(request: web.Request) -> web.StreamResponse:
+    """Serve static PWA icons from the frontend source tree."""
+    filename = request.match_info["filename"]
+    icon_path = web_console_static.get_web_console_frontend_root() / "icons" / filename
+    if not icon_path.is_file():
+        raise web.HTTPNotFound(text=f"icon not found: {filename}")
+    return web.FileResponse(icon_path)
 
 
 async def _event_stream_generator(request: web.Request, session_id: str):
@@ -87,4 +126,11 @@ def register_web_console_routes(app: web.Application, adapter: Any = None) -> No
         "/api/gui/stream/session/{session_id}", handle_session_event_stream
     )
     register_web_console_api_routes(app)
+    app.router.add_get("/app", handle_app_redirect)
     app.router.add_get("/app/", handle_app_root)
+    app.router.add_get("/app/index.html", handle_app_root)
+    app.router.add_get("/app/manifest.json", handle_app_manifest)
+    app.router.add_get("/app/sw.js", handle_app_service_worker)
+    app.router.add_get("/app/icons/{filename}", handle_app_icon)
+    app.router.add_get("/app/assets/{tail:.*}", handle_app_asset)
+    app.router.add_get("/app/{tail:.*}", handle_app_root)
