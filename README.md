@@ -9,6 +9,7 @@ Welcome to the **Hermes Web Console GUI**! This repository transforms the core c
 It now ships with a shared slash-command registry, a dedicated **Command Browser** page, and broad practical parity with the Hermes CLI while drastically reducing the friction of configuration via intuitive, highly-polished React components.
 
 ## 📸 UI Gallery
+Use any model you want — [Nous Portal](https://portal.nousresearch.com), [OpenRouter](https://openrouter.ai) (200+ models), [Xiaomi MiMo](https://platform.xiaomimimo.com), [z.ai/GLM](https://z.ai), [Kimi/Moonshot](https://platform.moonshot.ai), [MiniMax](https://www.minimax.io), [Hugging Face](https://huggingface.co), OpenAI, or your own endpoint. Switch with `hermes model` — no code changes, no lock-in.
 
 Here is a glimpse of the gorgeous new interfaces powering your agent:
 

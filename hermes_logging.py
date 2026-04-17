@@ -79,15 +79,8 @@ def set_session_context(session_id: str) -> None:
 
 
 def clear_session_context() -> None:
-    """Clear the session ID for the current thread.
-
-    Call this when done with a conversation to stop including the session
-    tag in log output on this thread.
-    """
-    try:
-        delattr(_session_context, "session_id")
-    except AttributeError:
-        pass
+    """Clear the session ID for the current thread."""
+    _session_context.session_id = None
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +358,7 @@ def _add_rotating_handler(
     path.parent.mkdir(parents=True, exist_ok=True)
     handler = _ManagedRotatingFileHandler(
         str(path), maxBytes=max_bytes, backupCount=backup_count,
+        encoding="utf-8",
     )
     handler.setLevel(level)
     handler.setFormatter(formatter)

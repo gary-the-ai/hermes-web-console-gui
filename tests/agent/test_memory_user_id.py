@@ -109,14 +109,12 @@ class TestMemoryManagerUserIdThreading:
         assert "user_id" not in p._init_kwargs
 
     def test_multiple_providers_all_receive_user_id(self):
-        from agent.builtin_memory_provider import BuiltinMemoryProvider
-
         mgr = MemoryManager()
-        # Use builtin + one external (MemoryManager only allows one external)
-        builtin = BuiltinMemoryProvider()
-        ext = RecordingProvider("external")
-        mgr.add_provider(builtin)
-        mgr.add_provider(ext)
+        # Use one provider named "builtin" (always accepted) and one external
+        p1 = RecordingProvider("builtin")
+        p2 = RecordingProvider("external")
+        mgr.add_provider(p1)
+        mgr.add_provider(p2)
 
         mgr.initialize_all(
             session_id="sess-multi",
@@ -124,8 +122,10 @@ class TestMemoryManagerUserIdThreading:
             user_id="slack_U12345",
         )
 
-        assert ext._init_kwargs.get("user_id") == "slack_U12345"
-        assert ext._init_kwargs.get("platform") == "slack"
+        assert p1._init_kwargs.get("user_id") == "slack_U12345"
+        assert p1._init_kwargs.get("platform") == "slack"
+        assert p2._init_kwargs.get("user_id") == "slack_U12345"
+        assert p2._init_kwargs.get("platform") == "slack"
 
 
 # ---------------------------------------------------------------------------
@@ -210,17 +210,18 @@ class TestMem0UserIdScoping:
 class TestHonchoUserIdScoping:
     """Verify Honcho plugin uses gateway user_id only when no explicit peer_name exists."""
 
-    def test_gateway_user_id_fills_missing_peer_name(self):
-        """When user_id is in kwargs and peer_name is unset, cfg.peer_name should be populated."""
+    def test_gateway_user_id_overrides_peer_name(self):
+        """When user_id is in kwargs and no explicit peer_name, user_id should be used."""
         from plugins.memory.honcho import HonchoMemoryProvider
 
         provider = HonchoMemoryProvider()
 
+        # Create a mock config with NO explicit peer_name
         mock_cfg = MagicMock()
         mock_cfg.enabled = True
         mock_cfg.api_key = "test-key"
         mock_cfg.base_url = None
-        mock_cfg.peer_name = None
+        mock_cfg.peer_name = ""  # No explicit peer_name — user_id should fill it
         mock_cfg.recall_mode = "tools"  # Use tools mode to defer session init
 
         with patch(
