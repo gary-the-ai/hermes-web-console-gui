@@ -90,8 +90,13 @@ export function SessionPreview({ title, summary, transcript, sessionId }: Sessio
         </div>
       </div>
       <div className="session-preview-transcript">
-        {transcript.map((line) => (
-          <div key={line} className="session-preview-line">
+        {transcript.length === 0 && (
+          <div className="session-preview-line" style={{ color: '#94a3b8' }}>
+            No transcript messages available for this session yet.
+          </div>
+        )}
+        {transcript.map((line, index) => (
+          <div key={`${index}-${line.slice(0, 32)}`} className="session-preview-line">
             {line}
           </div>
         ))}

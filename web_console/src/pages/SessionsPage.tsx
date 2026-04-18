@@ -91,29 +91,46 @@ export function SessionsPage() {
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
-    Promise.all([
-      apiClient.get<SessionDetailResponse>(`/sessions/${selectedId}`),
-      apiClient.get<TranscriptResponse>(`/sessions/${selectedId}/transcript`)
-    ])
-      .then(([detail, transcriptResponse]) => {
-        if (!active) return;
-        if (detail.ok) {
-          setTitle(detail.session.title ?? selectedId);
-          setSummary(detail.session.recap?.preview ?? 'No summary available.');
-        }
-        if (transcriptResponse.ok) {
-          setTranscript(
-            transcriptResponse.items.map((item) => `${item.role ?? 'message'}: ${item.content ?? ''}`)
-          );
-        }
+    const encodedId = encodeURIComponent(selectedId);
+
+    void apiClient.get<SessionDetailResponse>(`/sessions/${encodedId}`)
+      .then((detail) => {
+        if (!active || !detail.ok) return;
+        setTitle(detail.session.title ?? selectedId);
+        setSummary(detail.session.recap?.preview ?? 'No summary available.');
       })
       .catch((err) => {
         if (!active) return;
-        setSummary('Failed to load conversation history.');
-        setTranscript([]);
-        toastStore.error('Session Detail Failed', err instanceof Error ? err.message : String(err));
+        setTitle(selectedId);
+        setSummary('Failed to load session summary.');
+        toastStore.error('Session Summary Failed', err instanceof Error ? err.message : String(err));
+      });
+
+    void apiClient.get<TranscriptResponse>(`/sessions/${encodedId}/transcript`)
+      .then((transcriptResponse) => {
+        if (!active || !transcriptResponse.ok) return;
+        setTranscript(
+          (transcriptResponse.items || []).map((item) => {
+            const rawContent = item.content;
+            let contentText = '';
+            if (typeof rawContent === 'string') {
+              contentText = rawContent;
+            } else if (rawContent != null) {
+              try {
+                contentText = JSON.stringify(rawContent);
+              } catch {
+                contentText = String(rawContent);
+              }
+            }
+            return `${item.role ?? 'message'}: ${contentText}`;
+          })
+        );
       })
-      .finally(() => undefined);
+      .catch((err) => {
+        if (!active) return;
+        setTranscript([]);
+        toastStore.error('Transcript Load Failed', err instanceof Error ? err.message : String(err));
+      });
 
     return () => {
       active = false;
@@ -121,18 +138,18 @@ export function SessionsPage() {
   }, [selectedId]);
 
   const handleRename = async (id: string, newTitle: string) => {
-    await apiClient.post(`/sessions/${id}/title`, { title: newTitle });
+    await apiClient.post(`/sessions/${encodeURIComponent(id)}/title`, { title: newTitle });
     await refreshSessions();
   };
 
   const handleResume = async (id: string) => {
-    await apiClient.post(`/sessions/${id}/resume`, {});
+    await apiClient.post(`/sessions/${encodeURIComponent(id)}/resume`, {});
     // Navigate to chat with this session (using hash routing)
     window.location.hash = `#/chat/${id}`;
   };
 
   const handleDelete = async (id: string) => {
-    await apiClient.del(`/sessions/${id}`);
+    await apiClient.del(`/sessions/${encodeURIComponent(id)}`);
     if (selectedId === id) {
       setSelectedId('');
       setTitle('');
