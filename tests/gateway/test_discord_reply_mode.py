@@ -78,6 +78,7 @@ def _ensure_discord_mock():
 
 _ensure_discord_mock()
 
+import gateway.platforms.discord as discord_platform_mod  # noqa: E402
 from gateway.platforms.discord import DiscordAdapter  # noqa: E402
 
 
@@ -130,9 +131,14 @@ def _make_discord_adapter(reply_to_mode: str = "first"):
     config = PlatformConfig(enabled=True, token="test-token", reply_to_mode=reply_to_mode)
     adapter = DiscordAdapter(config)
 
-    # Mock the Discord client and channel
+    # Mock the Discord client and channel.
+    # ref_message.to_reference() → a distinct sentinel: the adapter now wraps
+    # the fetched Message via to_reference(fail_if_not_exists=False) so a
+    # deleted target degrades to "send without reply chip" instead of a 400.
     mock_channel = AsyncMock()
     ref_message = MagicMock()
+    ref_reference = MagicMock(name="MessageReference")
+    ref_message.to_reference = MagicMock(return_value=ref_reference)
     mock_channel.fetch_message = AsyncMock(return_value=ref_message)
 
     sent_msg = MagicMock()
@@ -143,7 +149,9 @@ def _make_discord_adapter(reply_to_mode: str = "first"):
     mock_client.get_channel = MagicMock(return_value=mock_channel)
 
     adapter._client = mock_client
-    return adapter, mock_channel, ref_message
+    # Return the reference sentinel alongside so tests can assert identity.
+    adapter._test_expected_reference = ref_reference
+    return adapter, mock_channel, ref_reference
 
 
 class TestSendWithReplyToMode:
@@ -309,23 +317,17 @@ class TestEnvVarOverride:
 # Tests for reply_to_text extraction in _handle_message
 # ------------------------------------------------------------------
 
-# Build FakeDMChannel from the exact discord module imported by the adapter
-# under test. This avoids full-suite ordering bugs where test files install
-# different discord mocks and ``isinstance(..., discord.DMChannel)`` checks in
-# gateway.platforms.discord end up comparing against a different class object.
-try:
-    from gateway.platforms import discord as _discord_adapter_mod
-    _DMChannelBase = _discord_adapter_mod.discord.DMChannel
-except (ImportError, AttributeError):
-    _DMChannelBase = object
+def _make_dm_channel(channel_id: int = 100, name: str = "dm"):
+    """Build a DMChannel instance compatible with the adapter's live discord mock."""
+    dm_base = getattr(discord_platform_mod.discord, "DMChannel", object)
 
+    class FakeDMChannel(dm_base):
+        def __init__(self, channel_id: int = 100, name: str = "dm"):
+            # Do NOT call super().__init__() — real DMChannel requires State
+            self.id = channel_id
+            self.name = name
 
-class FakeDMChannel(_DMChannelBase):
-    """Minimal DM channel stub (skips mention / channel-allow checks)."""
-    def __init__(self, channel_id: int = 100, name: str = "dm"):
-        # Do NOT call super().__init__() — real DMChannel requires State
-        self.id = channel_id
-        self.name = name
+    return FakeDMChannel(channel_id=channel_id, name=name)
 
 
 def _make_message(*, content: str = "hi", reference=None):
@@ -338,7 +340,7 @@ def _make_message(*, content: str = "hi", reference=None):
         attachments=[],
         reference=reference,
         created_at=datetime.now(timezone.utc),
-        channel=FakeDMChannel(),
+        channel=_make_dm_channel(),
         author=author,
     )
 
@@ -346,6 +348,7 @@ def _make_message(*, content: str = "hi", reference=None):
 @pytest.fixture
 def reply_text_adapter(monkeypatch):
     """DiscordAdapter wired for _handle_message → handle_message capture."""
+    discord_platform_mod.discord = sys.modules["discord"]
     config = PlatformConfig(enabled=True, token="fake-token")
     adapter = DiscordAdapter(config)
     adapter._client = SimpleNamespace(user=SimpleNamespace(id=999))

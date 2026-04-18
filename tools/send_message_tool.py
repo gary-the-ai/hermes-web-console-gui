@@ -215,7 +215,27 @@ def _handle_send(args):
 
     pconfig = config.platforms.get(platform)
     if not pconfig or not pconfig.enabled:
-        return tool_error(f"Platform '{platform_name}' is not configured. Set up credentials in ~/.hermes/config.yaml or environment variables.")
+        # Weixin can be configured purely via .env; synthesize a pconfig so
+        # send_message and cron delivery work without a gateway.yaml entry.
+        if platform_name == "weixin":
+            import os
+            wx_token = os.getenv("WEIXIN_TOKEN", "").strip()
+            wx_account = os.getenv("WEIXIN_ACCOUNT_ID", "").strip()
+            if wx_token and wx_account:
+                from gateway.config import PlatformConfig
+                pconfig = PlatformConfig(
+                    enabled=True,
+                    token=wx_token,
+                    extra={
+                        "account_id": wx_account,
+                        "base_url": os.getenv("WEIXIN_BASE_URL", "").strip(),
+                        "cdn_base_url": os.getenv("WEIXIN_CDN_BASE_URL", "").strip(),
+                    },
+                )
+            else:
+                return tool_error(f"Platform '{platform_name}' is not configured. Set up credentials in ~/.hermes/config.yaml or environment variables.")
+        else:
+            return tool_error(f"Platform '{platform_name}' is not configured. Set up credentials in ~/.hermes/config.yaml or environment variables.")
 
     from gateway.platforms.base import BasePlatformAdapter
 
@@ -225,6 +245,12 @@ def _handle_send(args):
     used_home_channel = False
     if not chat_id:
         home = config.get_home_channel(platform)
+        if not home and platform_name == "weixin":
+            import os
+            wx_home = os.getenv("WEIXIN_HOME_CHANNEL", "").strip()
+            if wx_home:
+                from gateway.config import HomeChannel
+                home = HomeChannel(platform=platform, chat_id=wx_home, name="Weixin Home")
         if home:
             chat_id = home.chat_id
             used_home_channel = True
@@ -259,7 +285,11 @@ def _handle_send(args):
             try:
                 from gateway.mirror import mirror_to_session
                 from gateway.session_context import get_session_env
-                source_label = get_session_env("HERMES_SESSION_PLATFORM", "cli")
+                source_label = (
+                    get_session_env("HERMES_SESSION_PLATFORM", "")
+                    or os.getenv("HERMES_SESSION_PLATFORM", "")
+                    or "cli"
+                )
                 if mirror_to_session(platform_name, chat_id, mirror_text, source_label=source_label, thread_id=thread_id):
                     result["mirrored"] = True
             except Exception:
@@ -1274,7 +1304,7 @@ async def _send_qqbot(pconfig, chat_id, message):
 
             # Step 2: Send message via REST
             headers = {
-                "Authorization": f"QQBotAccessToken {access_token}",
+                "Authorization": f"QQBot {access_token}",
                 "Content-Type": "application/json",
             }
             url = f"https://api.sgroup.qq.com/channels/{chat_id}/messages"

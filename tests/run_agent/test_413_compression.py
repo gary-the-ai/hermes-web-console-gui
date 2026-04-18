@@ -21,6 +21,24 @@ import pytest
 
 from agent.context_compressor import SUMMARY_PREFIX
 from run_agent import AIAgent
+import run_agent
+
+
+# ---------------------------------------------------------------------------
+# Fast backoff for compression retry tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _no_compression_sleep(monkeypatch):
+    """Short-circuit the 2s time.sleep between compression retries.
+
+    Production code has ``time.sleep(2)`` in multiple places after a 413/context
+    compression, for rate-limit smoothing. Tests assert behavior, not timing.
+    """
+    import time as _time
+    monkeypatch.setattr(_time, "sleep", lambda *_a, **_k: None)
+    monkeypatch.setattr(run_agent, "jittered_backoff", lambda *a, **k: 0.0)
 
 
 # ---------------------------------------------------------------------------
@@ -435,11 +453,15 @@ class TestPreflightCompression:
             )
             result = agent.run_conversation("hello", conversation_history=big_history)
 
-        # Preflight compression should have been called before the API call.
-        # The merged preflight path may attempt a second compression pass if
-        # the mocked compressed transcript still lands slightly above the tiny
-        # threshold used in this test.
-        assert mock_compress.call_count >= 1
+        # Preflight compression is a multi-pass loop (up to 3 passes for very
+        # large sessions, breaking when no further reduction is possible).
+        # First pass must have received the full oversized history.
+        assert mock_compress.call_count >= 1, "Preflight compression never ran"
+        first_call_messages = mock_compress.call_args_list[0].args[0]
+        assert len(first_call_messages) >= 40, (
+            f"First preflight pass should see the full history, got "
+            f"{len(first_call_messages)} messages"
+        )
         assert result["completed"] is True
         assert result["final_response"] == "After preflight"
 
