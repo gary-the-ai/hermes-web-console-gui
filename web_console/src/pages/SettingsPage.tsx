@@ -56,6 +56,7 @@ function buildCategories(s: Record<string, any>): SettingCategory[] {
         { id: 'memory.memory_char_limit', label: 'Memory Char Limit', type: 'number', value: Number(s.memory?.memory_char_limit ?? 2200) },
         { id: 'memory.user_char_limit', label: 'User Char Limit', type: 'number', value: Number(s.memory?.user_char_limit ?? 1375) },
         { id: 'memory.provider', label: 'Memory Provider', type: 'select', value: String(s.memory?.provider ?? 'built-in'), options: ['built-in', 'honcho'] },
+        { id: 'session_store_max_age_days', label: 'Session Retention (Days)', type: 'number', value: Number(s.session_store_max_age_days ?? 90) },
         { id: 'checkpoints.enabled', label: 'File Checkpoints', type: 'boolean', value: Boolean(s.checkpoints?.enabled ?? true) },
         { id: 'checkpoints.max_snapshots', label: 'Max Checkpoints', type: 'number', value: Number(s.checkpoints?.max_snapshots ?? 50) },
         { id: 'smart_model_routing.enabled', label: 'Smart Model Routing', type: 'boolean', value: Boolean(s.smart_model_routing?.enabled ?? false) },
