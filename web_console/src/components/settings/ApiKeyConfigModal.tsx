@@ -15,6 +15,7 @@ export function ApiKeyConfigModal({ onClose, onSaved, categories }: ApiKeyConfig
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showMasked, setShowMasked] = useState<Record<string, boolean>>({});
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     async function loadSchema() {
@@ -82,8 +83,17 @@ export function ApiKeyConfigModal({ onClose, onSaved, categories }: ApiKeyConfig
 
   // Filter schema to only the categories we're editing
   const filteredFields = Object.entries(schema)
-    .filter(([_, item]) => categories.includes(item.category || 'provider') && !item.advanced)
+    .filter(([_, item]) => {
+      if (!categories.includes(item.category || 'provider')) {
+        return false;
+      }
+      return showAdvanced || !item.advanced;
+    })
     .sort(([aKey], [bKey]) => aKey.localeCompare(bKey));
+
+  const advancedCount = Object.values(schema).filter(
+    item => categories.includes(item.category || 'provider') && item.advanced
+  ).length;
 
   return (
     <div style={{
@@ -104,6 +114,41 @@ export function ApiKeyConfigModal({ onClose, onSaved, categories }: ApiKeyConfig
           <p style={{ color: '#94a3b8' }}>Loading schema...</p>
         ) : (
           <div style={{ overflowY: 'auto', paddingRight: '8px', flex: 1 }}>
+            {advancedCount > 0 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '16px',
+                padding: '12px 14px',
+                background: 'rgba(15, 23, 42, 0.55)',
+                border: '1px solid rgba(148, 163, 184, 0.14)',
+                borderRadius: '10px',
+                color: '#cbd5e1',
+                fontSize: '0.82rem',
+              }}>
+                <div>
+                  Advanced provider fields include base URL overrides and less common providers such as NVIDIA NIM.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(prev => !prev)}
+                  style={{
+                    background: showAdvanced ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${showAdvanced ? 'rgba(56, 189, 248, 0.35)' : 'rgba(255,255,255,0.1)'}`,
+                    color: showAdvanced ? '#38bdf8' : '#cbd5e1',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {showAdvanced ? 'Hide Advanced' : `Show Advanced (${advancedCount})`}
+                </button>
+              </div>
+            )}
             <form id="apikeyform" onSubmit={e => { e.preventDefault(); handleSave(); }}>
               {filteredFields.map(([key, field]) => (
                 <div key={key} style={{ marginBottom: '16px' }}>

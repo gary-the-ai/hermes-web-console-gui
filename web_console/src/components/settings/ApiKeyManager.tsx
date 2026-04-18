@@ -108,7 +108,7 @@ export function ApiKeyManager() {
         <div>
           <h2 style={{ margin: 0, color: '#e2e8f0', fontSize: '1.1rem' }}>🔐 API Keys & Providers</h2>
           <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.85rem' }}>
-            Provider authentication status. Keys are configured in <code style={{ color: '#94a3b8', background: 'rgba(0,0,0,0.3)', padding: '1px 4px', borderRadius: '3px' }}>~/.hermes/.env</code>
+            Provider authentication status. Keys are configured in <code style={{ color: '#94a3b8', background: 'rgba(0,0,0,0.3)', padding: '1px 4px', borderRadius: '3px' }}>~/.hermes/.env</code>. Less common providers and base URL overrides are available under <strong>Show Advanced</strong>.
           </p>
         </div>
         <button
@@ -160,6 +160,9 @@ export function ApiKeyManager() {
               {group.map(p => {
                 const loggedIn = Boolean(p.status?.logged_in);
                 const isActive = p.active;
+                const baseUrl = typeof p.status?.base_url === 'string' ? p.status.base_url : '';
+                const keySource = typeof p.status?.key_source === 'string' ? p.status.key_source : '';
+                const authTypeLabel = formatAuthType(p.auth_type);
 
                 return (
                   <div 
@@ -197,6 +200,42 @@ export function ApiKeyManager() {
                         {loggedIn ? 'Configured' : 'Not configured'}
                         {isActive && ' · Active'}
                       </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                        {authTypeLabel && (
+                          <span style={{
+                            fontSize: '0.65rem',
+                            padding: '2px 6px',
+                            borderRadius: '999px',
+                            background: 'rgba(148, 163, 184, 0.12)',
+                            color: '#cbd5e1',
+                          }}>
+                            {authTypeLabel}
+                          </span>
+                        )}
+                        {keySource && (
+                          <span style={{
+                            fontSize: '0.65rem',
+                            padding: '2px 6px',
+                            borderRadius: '999px',
+                            background: 'rgba(56, 189, 248, 0.08)',
+                            color: '#7dd3fc',
+                          }}>
+                            {keySource}
+                          </span>
+                        )}
+                      </div>
+                      {baseUrl && (
+                        <div style={{
+                          fontSize: '0.66rem',
+                          color: '#94a3b8',
+                          marginTop: '6px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {baseUrl}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{
@@ -222,6 +261,22 @@ export function ApiKeyManager() {
                           }}
                         >
                           Manage
+                        </button>
+                      )}
+                      {p.provider !== 'openai-codex' && (
+                        <button
+                          onClick={() => setConfigModalCategories(['provider'])}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.06)',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            color: '#cbd5e1',
+                            borderRadius: '4px',
+                            padding: '2px 8px',
+                            fontSize: '0.7rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Edit
                         </button>
                       )}
                     </div>
@@ -288,4 +343,22 @@ function guessCategory(providerId: string): string {
   }
   // Everything else is a provider
   return 'provider';
+}
+
+function formatAuthType(authType: string | null): string {
+  if (!authType) {
+    return '';
+  }
+  switch (authType) {
+    case 'api_key':
+      return 'API Key';
+    case 'oauth_device_code':
+      return 'Device Code';
+    case 'oauth_external':
+      return 'External OAuth';
+    case 'external_process':
+      return 'Local Process';
+    default:
+      return authType.replace(/_/g, ' ');
+  }
 }
