@@ -17,38 +17,63 @@ interface DetailedHealthResponse {
   pid: number | null;
 }
 
+interface DeploymentSettingsResponse {
+  ok: boolean;
+  settings?: {
+    gui?: {
+      host?: string;
+      port?: number;
+      mount_path?: string;
+      require_api_key?: string | boolean;
+      open_browser?: boolean;
+    };
+  };
+}
+
 export function SystemManager() {
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [restoreResult, setRestoreResult] = useState<{ restored?: number; total?: number; errors?: string[] } | null>(null);
   const [health, setHealth] = useState<DetailedHealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
+  const [deploymentSettings, setDeploymentSettings] = useState<DeploymentSettingsResponse['settings'] | null>(null);
+  const [deploymentError, setDeploymentError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadHealth = async () => {
+    const loadStatus = async () => {
       try {
         const base = getBackendUrl();
-        const response = await fetch(`${base}/health/detailed`);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        const [healthResponse, settingsResponse] = await Promise.all([
+          fetch(`${base}/health/detailed`),
+          fetch(`${base}/api/gui/settings`),
+        ]);
+        if (!healthResponse.ok) {
+          throw new Error(`Health HTTP ${healthResponse.status}`);
         }
-        const data = await response.json() as DetailedHealthResponse;
+        const healthData = await healthResponse.json() as DetailedHealthResponse;
+        let settingsData: DeploymentSettingsResponse | null = null;
+        if (settingsResponse.ok) {
+          settingsData = await settingsResponse.json() as DeploymentSettingsResponse;
+        }
         if (!cancelled) {
-          setHealth(data);
+          setHealth(healthData);
           setHealthError(null);
+          setDeploymentSettings(settingsData?.settings || null);
+          setDeploymentError(settingsResponse.ok ? null : `HTTP ${settingsResponse.status}`);
         }
       } catch (err) {
         if (!cancelled) {
           setHealthError(err instanceof Error ? err.message : String(err));
+          setDeploymentError(err instanceof Error ? err.message : String(err));
         }
       }
     };
 
-    void loadHealth();
+    void loadStatus();
     const timer = window.setInterval(() => {
-      void loadHealth();
+      void loadStatus();
     }, 15000);
 
     return () => {
@@ -153,8 +178,105 @@ export function SystemManager() {
     return { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' };
   };
 
+  const guiSettings = deploymentSettings?.gui;
+  const bindHost = guiSettings?.host || '127.0.0.1';
+  const bindPort = guiSettings?.port ?? 8642;
+  const mountPath = guiSettings?.mount_path || '/app';
+  const opensBrowser = Boolean(guiSettings?.open_browser);
+  const apiKeyConfigured = Boolean(guiSettings?.require_api_key);
+  const isLocalOnly = ['127.0.0.1', 'localhost', '::1'].includes(bindHost);
+  const deploymentTone = apiKeyConfigured
+    ? { color: '#4ade80', bg: 'rgba(74,222,128,0.12)', label: 'Auth Configured' }
+    : isLocalOnly
+      ? { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)', label: 'Local Only' }
+      : { color: '#f87171', bg: 'rgba(248,113,113,0.12)', label: 'Unsafe' };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '14px' }}>
+          <div>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#e2e8f0' }}>
+              🔐 Deployment Posture
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5 }}>
+              API server bind/auth settings that matter before exposing the GUI outside localhost.
+            </p>
+          </div>
+          <div style={{
+            padding: '6px 10px',
+            borderRadius: '999px',
+            background: deploymentTone.bg,
+            color: deploymentTone.color,
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}>
+            {deploymentTone.label}
+          </div>
+        </div>
+
+        {deploymentError ? (
+          <div style={{ color: '#fda4af', fontSize: '0.82rem' }}>
+            Failed to load deployment settings: {deploymentError}
+          </div>
+        ) : (
+          <>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: '10px',
+              marginBottom: '14px',
+            }}>
+              {[
+                ['Bind', `${bindHost}:${bindPort}`],
+                ['GUI Path', mountPath],
+                ['API Key', apiKeyConfigured ? 'Configured' : 'Not configured'],
+                ['Auto Open', opensBrowser ? 'Enabled' : 'Disabled'],
+              ].map(([label, value]) => (
+                <div key={label} style={{
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+                  <div style={{ marginTop: '4px', fontSize: '0.84rem', color: '#e2e8f0', fontWeight: 600 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            {!apiKeyConfigured && isLocalOnly && (
+              <div style={{
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'rgba(251,191,36,0.08)',
+                border: '1px solid rgba(251,191,36,0.18)',
+                color: '#fde68a',
+                fontSize: '0.8rem',
+                lineHeight: 1.55,
+              }}>
+                Local-only mode is acceptable for development, but every request is currently accepted without authentication. Set <code>API_SERVER_KEY</code> before using a shared host, tunnel, reverse proxy, or LAN bind.
+              </div>
+            )}
+
+            {!apiKeyConfigured && !isLocalOnly && (
+              <div style={{
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'rgba(248,113,113,0.08)',
+                border: '1px solid rgba(248,113,113,0.18)',
+                color: '#fecdd3',
+                fontSize: '0.8rem',
+                lineHeight: 1.55,
+              }}>
+                This bind target is network-accessible and should not be exposed without a real <code>API_SERVER_KEY</code>. Hermes refuses to start that combination, so treat this as a configuration error until a key is set.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '14px' }}>
           <div>
