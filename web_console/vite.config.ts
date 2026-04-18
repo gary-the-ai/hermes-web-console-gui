@@ -2,6 +2,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const apiServerKey = process.env.API_SERVER_KEY?.trim();
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -9,6 +11,7 @@ export default defineConfig({
       '/api/gui': {
         target: 'http://127.0.0.1:8642',
         changeOrigin: true,
+        headers: apiServerKey ? { Authorization: `Bearer ${apiServerKey}` } : undefined,
         configure: (proxy, _options) => {
           // Strip the browser Origin header so the backend CORS middleware
           // doesn't reject proxied requests from the dev server.

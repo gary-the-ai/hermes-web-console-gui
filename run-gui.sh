@@ -20,6 +20,7 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+HERMES_ENV_FILE="${HERMES_HOME:-$HOME/.hermes}/.env"
 
 echo ""
 echo -e "${CYAN}⚕ Starting Hermes Web Console...${NC}"
@@ -35,10 +36,34 @@ else
     exit 1
 fi
 
+# Load user env vars so the backend and Vite proxy inherit API_SERVER_KEY.
+if [ -f "$HERMES_ENV_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$HERMES_ENV_FILE"
+    set +a
+fi
+
 # Run the python gateway in the background
-python "$SCRIPT_DIR/gateway/run.py" &
+API_SERVER_ENABLED=true python "$SCRIPT_DIR/gateway/run.py" &
 BACKEND_PID=$!
 echo -e "  ↳ Backend PID: $BACKEND_PID"
+
+# Wait briefly for the API server to accept connections before starting Vite.
+for _ in $(seq 1 50); do
+    if (echo > /dev/tcp/127.0.0.1/8642) >/dev/null 2>&1; then
+        break
+    fi
+    if ! kill -0 $BACKEND_PID 2>/dev/null; then
+        echo -e "${RED}✗ Backend exited before opening port 8642.${NC}"
+        exit 1
+    fi
+    sleep 0.2
+done
+
+if ! (echo > /dev/tcp/127.0.0.1/8642) >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠ Backend is still starting; the frontend will retry automatically.${NC}"
+fi
 
 # 2. Start the React Frontend
 echo -e "${GREEN}✓${NC} Initializing React Frontend..."
