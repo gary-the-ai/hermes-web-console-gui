@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { getBackendUrl, isLocalMode } from '../store/backendStore';
+import { backendFetch } from './backendFetch';
 
 export type BackendMode = 'hermes' | 'generic' | 'offline';
 
@@ -37,7 +38,7 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
   const healthCheck = useCallback(async () => {
     try {
       const base = getBackendUrl();
-      const res = await fetch(`${base}/api/gui/metrics/global`, { signal: AbortSignal.timeout(4000) });
+      const res = await backendFetch(`${base}/api/gui/metrics/global`, { signal: AbortSignal.timeout(4000) });
       if (!res.ok) throw new Error('not ok');
       const data = await res.json();
       setState({

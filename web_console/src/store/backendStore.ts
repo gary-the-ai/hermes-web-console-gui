@@ -7,6 +7,7 @@
  */
 
 const STORAGE_KEY = 'hermes-backend-url';
+const AUTH_KEY_STORAGE_KEY = 'hermes-backend-auth-key';
 const DEFAULT_URL = 'http://localhost:8642';
 
 /** True when the frontend is served from the same host as the backend. */
@@ -41,4 +42,23 @@ export function clearBackendUrl(): void {
 /** Check if a stored URL exists in localStorage. */
 export function hasSavedBackendUrl(): boolean {
   return !!localStorage.getItem(STORAGE_KEY);
+}
+
+/** Read the stored backend bearer token, if any. */
+export function getBackendAuthKey(): string {
+  return localStorage.getItem(AUTH_KEY_STORAGE_KEY) || '';
+}
+
+/** Persist a backend bearer token for hosted/direct-backend mode. */
+export function setBackendAuthKey(key: string): void {
+  const clean = key.trim();
+  if (clean) {
+    localStorage.setItem(AUTH_KEY_STORAGE_KEY, clean);
+  } else {
+    localStorage.removeItem(AUTH_KEY_STORAGE_KEY);
+  }
+}
+
+export function hasSavedBackendAuthKey(): boolean {
+  return !!getBackendAuthKey();
 }

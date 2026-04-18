@@ -1,4 +1,5 @@
 import { getBackendUrl } from '../store/backendStore';
+import { backendFetch, buildBackendHeaders } from './backendFetch';
 
 export interface ApiClientOptions {
   baseUrl?: string;
@@ -19,7 +20,7 @@ export class ApiClient {
   }
 
   async get<T>(path: string): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`);
+    const response = await backendFetch(`${this.baseUrl}${path}`);
     if (!response.ok) {
       let detail = '';
       try { const j = await response.json(); detail = j?.error?.message ?? JSON.stringify(j); } catch { /* */ }
@@ -29,9 +30,9 @@ export class ApiClient {
   }
 
   async post<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await backendFetch(`${this.baseUrl}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildBackendHeaders({ 'Content-Type': 'application/json' }),
       body: body === undefined ? undefined : JSON.stringify(body)
     });
     if (!response.ok) {
@@ -45,7 +46,7 @@ export class ApiClient {
   async upload<T>(path: string, file: File): Promise<T> {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await backendFetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       body: formData,
     });
@@ -56,9 +57,9 @@ export class ApiClient {
   }
 
   async patch<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await backendFetch(`${this.baseUrl}${path}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildBackendHeaders({ 'Content-Type': 'application/json' }),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!response.ok) {
@@ -68,9 +69,9 @@ export class ApiClient {
   }
 
   async del<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await backendFetch(`${this.baseUrl}${path}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildBackendHeaders({ 'Content-Type': 'application/json' }),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!response.ok) {

@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
-import { isLocalMode, getBackendUrl, setBackendUrl, hasSavedBackendUrl } from '../../store/backendStore';
+import { isLocalMode, getBackendUrl, setBackendUrl, hasSavedBackendAuthKey, hasSavedBackendUrl, setBackendAuthKey } from '../../store/backendStore';
 import { useConnection } from '../../lib/connectionContext';
+import { buildBackendHeaders } from '../../lib/backendFetch';
 
 /**
  * ConnectGate — wraps the main app and shows a connect screen
@@ -27,6 +28,7 @@ export function ConnectGate({ children }: { children: ReactNode }) {
 function ConnectScreen() {
   const connection = useConnection();
   const [url, setUrl] = useState(() => getBackendUrl() || 'http://localhost:8642');
+  const [authKey, setAuthKey] = useState(() => hasSavedBackendAuthKey() ? localStorage.getItem('hermes-backend-auth-key') || '' : '');
   const [status, setStatus] = useState<'idle' | 'testing' | 'error' | 'success'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -45,6 +47,7 @@ function ConnectScreen() {
 
     try {
       const res = await fetch(`${testUrl}/api/gui/metrics/global`, {
+        headers: buildBackendHeaders(authKey ? { Authorization: `Bearer ${authKey.trim()}` } : undefined),
         signal: AbortSignal.timeout(5000),
       });
 
@@ -54,6 +57,7 @@ function ConnectScreen() {
       if (data.ok) {
         setStatus('success');
         setBackendUrl(testUrl);
+        setBackendAuthKey(authKey);
         // Trigger reconnect so the ConnectionProvider picks up the new URL
         setTimeout(() => connection.reconnect(), 300);
       } else {
@@ -170,6 +174,37 @@ function ConnectScreen() {
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
                 e.currentTarget.style.boxShadow = 'none';
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              color: '#94a3b8',
+              marginBottom: '6px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}>API Server Key</label>
+            <input
+              type="password"
+              value={authKey}
+              onChange={(e) => setAuthKey(e.target.value)}
+              placeholder="Optional for localhost, required for keyed backends"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: 'rgba(0, 0, 0, 0.3)',
+                color: '#e2e8f0',
+                fontSize: '0.95rem',
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                outline: 'none',
+                transition: 'border-color 0.2s, box-shadow 0.2s',
+                boxSizing: 'border-box',
               }}
             />
           </div>

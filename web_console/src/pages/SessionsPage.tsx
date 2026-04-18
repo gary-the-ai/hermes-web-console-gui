@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/api';
 import { SessionList } from '../components/sessions/SessionList';
 import { SessionPreview } from '../components/sessions/SessionPreview';
+import { toastStore } from '../store/toastStore';
 
 interface ApiSessionSummary {
   session_id: string;
@@ -46,9 +47,11 @@ export function SessionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Array<{ id: string; title: string; snippet: string }>>([]);
   const [sourceFilter, setSourceFilter] = useState<'all' | 'cli' | 'web_console'>('all');
+  const [loading, setLoading] = useState(true);
 
   const refreshSessions = async () => {
     try {
+      setLoading(true);
       const sourceParam = sourceFilter === 'all' ? '' : `?source=${sourceFilter}`;
       const response = await apiClient.get<SessionsResponse>(`/sessions${sourceParam}`);
       if (response.ok && response.sessions.length > 0) {
@@ -64,9 +67,20 @@ export function SessionsPage() {
         }
       } else {
         setSessions([]);
+        setSelectedId('');
+        setTitle('');
+        setSummary('No saved sessions found.');
+        setTranscript([]);
       }
-    } catch {
-      // keep existing state
+    } catch (err) {
+      setSessions([]);
+      setSelectedId('');
+      setTitle('');
+      setSummary('Failed to load sessions.');
+      setTranscript([]);
+      toastStore.error('Sessions Load Failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -77,7 +91,6 @@ export function SessionsPage() {
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
-
     Promise.all([
       apiClient.get<SessionDetailResponse>(`/sessions/${selectedId}`),
       apiClient.get<TranscriptResponse>(`/sessions/${selectedId}/transcript`)
@@ -94,9 +107,13 @@ export function SessionsPage() {
           );
         }
       })
-      .catch(() => {
-        // keep existing state
-      });
+      .catch((err) => {
+        if (!active) return;
+        setSummary('Failed to load conversation history.');
+        setTranscript([]);
+        toastStore.error('Session Detail Failed', err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => undefined);
 
     return () => {
       active = false;
